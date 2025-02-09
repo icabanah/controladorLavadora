@@ -20,14 +20,23 @@ const int RESOLUCION_ADC = 12;
 const int VALOR_MAX_ADC = 4095;
 const int UMBRAL_NIVEL = (VOLTAJE_NIVEL / VOLTAJE_REFERENCIA) * VALOR_MAX_ADC;
 
-// Tiempos en segundos
-const int TIEMPO_DESFOGUE = 10;
-const int TIEMPO_CENTRIFUGADO = 10;
+// Tiempos en segundos para control de motor
 const int TIEMPO_GIRO_DERECHA = 3;
 const int TIEMPO_GIRO_IZQUIERDA = 3;
 const int TIEMPO_PAUSA_GIRO = 3;
-const int TIEMPO_BLOQUEO_FINAL = 5;
 const int TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA + TIEMPO_PAUSA_GIRO;
+
+// Tiempos fijos para procesos específicos
+const int TIEMPO_DESFOGUE = 10;
+const int TIEMPO_CENTRIFUGADO = 10;
+const int TIEMPO_BLOQUEO_FINAL = 5;
+
+// Tiempos de cada tanda en segundos (ya incluyen su tiempo de desfogue)
+const int tiemposTanda[3][3] = {
+  { 70, 55, 30 },  // Programa 1: 60+10, 45+10, 20+10
+  { 55, 40, 25 },  // Programa 2: 45+10, 30+10, 15+10
+  { 30, 25, 20 }   // Programa 3: 20+10, 15+10, 10+10
+};
 
 // Variables de estado y control
 uint8_t programaSeleccionado = 0;
@@ -53,13 +62,6 @@ enum EstadoLavado {
 };
 
 EstadoLavado estadoLavado = ESPERA;
-
-// Tiempos de cada programa en segundos
-const int tiemposTanda[3][3] = {
-  { 60, 45, 20 },  // Programa 1
-  { 45, 30, 15 },  // Programa 2
-  { 20, 15, 10 }   // Programa 3
-};
 
 // Declaraciones anticipadas de funciones
 void enviarComandoNextion(String comando);
@@ -120,12 +122,11 @@ void procesarTanda(int numeroTanda) {
   static unsigned long tiempoInicioSubEstado = 0;
   static unsigned long tiempoInicioTanda = 0;
   static unsigned long tiempoInicioDesfogue = 0;
-  static int ciclosLavado = 0;
   static String estadoAnterior = "";
 
   unsigned long tiempoActual = millis();
 
-  // Verificar si aún hay tiempo disponible
+  // Verificar tiempo total restante
   if (tiempoRestante <= 0) {
     enProgreso = false;
     estadoLavado = DESFOGUE_FINAL;
@@ -134,14 +135,12 @@ void procesarTanda(int numeroTanda) {
     return;
   }
 
-  // Leer el nivel de agua usando el sensor analógico
   bool nivelLimiteAgua = leerNivelAgua();
 
-  // Iniciamos el temporizador de la tanda si estamos en el estado de llenado y aún no se ha iniciado
+  // Iniciamos el temporizador de la tanda
   if (subEstado == LLENADO && tiempoInicioTanda == 0) {
     tiempoInicioTanda = tiempoActual;
     tiempoInicioSubEstado = tiempoActual;
-    // Aseguramos que inicie con giro a la derecha
     digitalWrite(GIRAR_DERECHA_PIN, HIGH);
     digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
   }
@@ -183,7 +182,8 @@ void procesarTanda(int numeroTanda) {
       break;
 
     case LAVADO:
-      if (tiempoActual - tiempoInicioTanda >= (unsigned long)tiemposTanda[programaSeleccionado - 1][numeroTanda - 1] * 1000) {
+      // Usamos el tiempo de tanda menos el tiempo de desfogue para el lavado
+      if (tiempoActual - tiempoInicioTanda >= (unsigned long)(tiemposTanda[programaSeleccionado - 1][numeroTanda - 1] - TIEMPO_DESFOGUE) * 1000) {
         subEstado = DESFOGUE;
         tiempoInicioDesfogue = tiempoActual;
         digitalWrite(GIRAR_DERECHA_PIN, LOW);
@@ -391,14 +391,12 @@ void toggleEmergencia() {
 
 int calcularTiempoTotal() {
   int total = 0;
-  // Suma de tiempos de cada tanda
+  // Suma de tiempos de cada tanda (que ya incluyen sus desfogues)
   for (int i = 0; i < 3; i++) {
     total += tiemposTanda[programaSeleccionado - 1][i];
-    // Agregar tiempo de desfogue por cada tanda
-    total += TIEMPO_DESFOGUE;
   }
-  // Agregar tiempo de centrifugado y bloqueo final
-  total += TIEMPO_CENTRIFUGADO + TIEMPO_BLOQUEO_FINAL;
+  // Agregar solo el tiempo de centrifugado
+  total += TIEMPO_CENTRIFUGADO;
   return total;
 }
 
