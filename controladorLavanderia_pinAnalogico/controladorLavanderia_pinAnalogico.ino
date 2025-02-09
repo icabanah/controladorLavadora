@@ -14,12 +14,15 @@ HardwareSerial NextionSerial(2);
 #define INGRESAR_AGUA_PIN 26
 #define DESFOGAR_PIN 25
 
-// Configuración del sensor de nivel
-const float VOLTAJE_REFERENCIA = 3.3;
-const float VOLTAJE_NIVEL = 2.5;
-const int RESOLUCION_ADC = 12;
-const int VALOR_MAX_ADC = 4095;
-const int UMBRAL_NIVEL = (VOLTAJE_NIVEL / VOLTAJE_REFERENCIA) * VALOR_MAX_ADC;
+// Configuración del ADC para el divisor de voltaje
+const float VOLTAJE_MAX_ENTRADA = 3.8;  // Voltaje máximo de entrada (antes del divisor)
+const float VOLTAJE_MIN_ENTRADA = 0.5;  // Voltaje mínimo de entrada
+const float VOLTAJE_MAX_ADC = 3.3;      // Voltaje máximo del ADC
+const float VOLTAJE_NIVEL = 2.5;        // Voltaje que indica nivel alcanzado (2.5V)
+const int RESOLUCION_ADC = 12;          // Resolución del ADC
+const int VALOR_MAX_ADC = 4095;         // Valor máximo del ADC (2^12 - 1)
+// Factor de escala del divisor de voltaje
+const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 
 // Tiempos en segundos para control de motor
 const int TIEMPO_GIRO_DERECHA = 3;
@@ -89,18 +92,23 @@ void enviarComandoNextion(String comando) {
 // Función para leer el nivel de agua
 bool leerNivelAgua() {
   int valorADC = analogRead(NIVEL_AGUA_PIN);
-  float voltaje = (valorADC * VOLTAJE_REFERENCIA) / VALOR_MAX_ADC;
 
+  // Convertir el valor ADC a voltaje real (antes del divisor)
+  float voltajeLeido = (valorADC * VOLTAJE_MAX_ENTRADA) / VALOR_MAX_ADC;
+
+  // Para depuración
   static unsigned long ultimoLog = 0;
-  if (millis() - ultimoLog > 1000) {
+  if (millis() - ultimoLog > 1000) {  // Log cada segundo
     Serial.print("Valor ADC: ");
     Serial.print(valorADC);
     Serial.print(" Voltaje: ");
-    Serial.println(voltaje);
+    Serial.print(voltajeLeido);
+    Serial.println("V");
     ultimoLog = millis();
   }
 
-  return valorADC >= UMBRAL_NIVEL;
+  // Comparar con el nivel deseado (2.5V)
+  return voltajeLeido >= VOLTAJE_NIVEL;
 }
 
 void configurarPaginaLavado() {
