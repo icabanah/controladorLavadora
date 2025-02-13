@@ -25,27 +25,27 @@ const uint16_t VALOR_MAX_ADC = 4095;         // Valor máximo del ADC (2^12 - 1)
 const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 
 // Tiempos en segundos para control de motor
-// const uint8_t TIEMPO_GIRO_DERECHA = 180; // 180 segundos
-// const uint8_t TIEMPO_GIRO_IZQUIERDA = 180;
-// const uint8_t TIEMPO_PAUSA_GIRO = 60;
-const uint8_t TIEMPO_GIRO_DERECHA = 3; // 180 segundos
-const uint8_t TIEMPO_GIRO_IZQUIERDA = 3;
-const uint8_t TIEMPO_PAUSA_GIRO = 1;
+const uint8_t TIEMPO_GIRO_DERECHA = 180; // 180 segundos
+const uint8_t TIEMPO_GIRO_IZQUIERDA = 180;
+const uint8_t TIEMPO_PAUSA_GIRO = 60;
+// const uint8_t TIEMPO_GIRO_DERECHA = 3; 
+// const uint8_t TIEMPO_GIRO_IZQUIERDA = 3;
+// const uint8_t TIEMPO_PAUSA_GIRO = 1;
 const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA + TIEMPO_PAUSA_GIRO;
 
 // Tiempos fijos para procesos específicos
 const uint8_t TIEMPO_DESFOGUE = 10;
-// const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
-// const uint8_t TIEMPO_BLOQUEO_FINAL = 120; // 2*60
-const uint16_t TIEMPO_CENTRIFUGADO = 10; // 7*60
-const uint8_t TIEMPO_BLOQUEO_FINAL = 7; // 2*60
+const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
+const uint8_t TIEMPO_BLOQUEO_FINAL = 120; // 2*60
+// const uint16_t TIEMPO_CENTRIFUGADO = 10; // 7*60
+// const uint8_t TIEMPO_BLOQUEO_FINAL = 7; // 2*60
 
 // Tiempos de cada tanda en segundos (ya incluyen su tiempo de desfogue)
 const uint16_t tiemposTanda[3][3] = {
   { 1690, 1510, 910},  // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
   { 1210, 910, 310},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 = 
-  // { 910, 610, 310 }   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
-  { 120, 60, 30 }   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+  { 910, 610, 310 }   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+  // { 120, 60, 30 }   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
 };
 
 // Variables de estado y control
