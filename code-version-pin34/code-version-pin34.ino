@@ -24,8 +24,8 @@ const uint16_t VALOR_MAX_ADC = 4095;   // Valor máximo del ADC (2^12 - 1)
 const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 
 // Tiempos en segundos para control de motor
-const uint8_t TIEMPO_GIRO_DERECHA = 180; // 180 segundos
-const uint8_t TIEMPO_GIRO_IZQUIERDA = 180;
+const uint8_t TIEMPO_GIRO_DERECHA = 90; // 180 segundos
+const uint8_t TIEMPO_GIRO_IZQUIERDA = 90;
 const uint8_t TIEMPO_PAUSA_GIRO = 60;
 // const uint8_t TIEMPO_GIRO_DERECHA = 5;
 // const uint8_t TIEMPO_GIRO_IZQUIERDA = 5;
@@ -602,7 +602,7 @@ void procesarDesfogueFinal()
   {
     tiempos.reset();
     pines.reset();
-    pines.desfogue = true;
+    pines.desfogue = false;
     pines.aplicar();
 
     estadoLavado = ESPERA;
@@ -833,6 +833,7 @@ void setup()
   tiempos.ultimaActualizacionSerial = millis();
   // Agregar después del código actual de setup
   pines.reset();
+  pines.desfogue = false; // Por seguridad, desfogue cerrado por defecto
   pines.aplicar();
   banderas.reset();
   tiempos.reset();
