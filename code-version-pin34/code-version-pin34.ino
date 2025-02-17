@@ -5,8 +5,8 @@
 // Configuración de pines
 // #define RX_PIN 16
 // #define TX_PIN 17
-#define NIVEL_AGUA_PIN 34       // Pin analógico para el sensor de nivel
-#define BTN_EMERGENCIA_PIN 15  // Usar el pin que tengas disponible
+#define NIVEL_AGUA_PIN 34     // Pin analógico para el sensor de nivel
+#define BTN_EMERGENCIA_PIN 15 // Usar el pin que tengas disponible
 #define BLOQUEAR_PUERTA_PIN 13
 #define GIRAR_DERECHA_PIN 12
 #define GIRAR_IZQUIERDA_PIN 14
@@ -15,63 +15,152 @@
 #define DESFOGAR_PIN 25
 
 // Configuración del ADC para el divisor de voltaje
-const float VOLTAJE_MAX_ENTRADA = 3.8;  // Voltaje máximo de entrada (antes del divisor)
-const float VOLTAJE_MIN_ENTRADA = 0.5;  // Voltaje mínimo de entrada
-const float VOLTAJE_MAX_ADC = 3.3;      // Voltaje máximo del ADC
-const float VOLTAJE_NIVEL = 3.0;        // Voltaje que indica nivel alcanzado (2.5V)
-const uint8_t RESOLUCION_ADC = 12;          // Resolución del ADC
-const uint16_t VALOR_MAX_ADC = 4095;         // Valor máximo del ADC (2^12 - 1)
+const float VOLTAJE_MAX_ENTRADA = 3.8; // Voltaje máximo de entrada (antes del divisor)
+const float VOLTAJE_MIN_ENTRADA = 0.5; // Voltaje mínimo de entrada
+const float VOLTAJE_MAX_ADC = 3.3;     // Voltaje máximo del ADC
+const float VOLTAJE_NIVEL = 3.0;       // Voltaje que indica nivel alcanzado (2.5V)
+const uint8_t RESOLUCION_ADC = 12;     // Resolución del ADC
+const uint16_t VALOR_MAX_ADC = 4095;   // Valor máximo del ADC (2^12 - 1)
 // Factor de escala del divisor de voltaje
 const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 
 // Tiempos en segundos para control de motor
-const uint8_t TIEMPO_GIRO_DERECHA = 180; // 180 segundos
-const uint8_t TIEMPO_GIRO_IZQUIERDA = 180;
-const uint8_t TIEMPO_PAUSA_GIRO = 60;
-// const uint8_t TIEMPO_GIRO_DERECHA = 3; 
-// const uint8_t TIEMPO_GIRO_IZQUIERDA = 3;
-// const uint8_t TIEMPO_PAUSA_GIRO = 1;
+// const uint8_t TIEMPO_GIRO_DERECHA = 180;  // 180 segundos
+// const uint8_t TIEMPO_GIRO_IZQUIERDA = 180;
+// const uint8_t TIEMPO_PAUSA_GIRO = 60;
+const uint8_t TIEMPO_GIRO_DERECHA = 5;
+const uint8_t TIEMPO_GIRO_IZQUIERDA = 5;
+const uint8_t TIEMPO_PAUSA_GIRO = 3;
 const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA + TIEMPO_PAUSA_GIRO;
 
 // Tiempos fijos para procesos específicos
-const uint8_t TIEMPO_DESFOGUE = 10;
-const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
-const uint8_t TIEMPO_BLOQUEO_FINAL = 120; // 2*60
-// const uint16_t TIEMPO_CENTRIFUGADO = 10; // 7*60
-// const uint8_t TIEMPO_BLOQUEO_FINAL = 7; // 2*60
+// const uint8_t TIEMPO_DESFOGUE = 120;
+// const uint16_t TIEMPO_CENTRIFUGADO = 420;  // 7*60
+// const uint8_t TIEMPO_BLOQUEO_FINAL = 120;  // 2*60
+const uint8_t TIEMPO_DESFOGUE = 5;
+const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
+const uint8_t TIEMPO_BLOQUEO_FINAL = 5; // 2*60
 
 // Tiempos de cada tanda en segundos (ya incluyen su tiempo de desfogue)
 const uint16_t tiemposTanda[3][3] = {
-  { 1690, 1510, 910},  // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
-  { 1210, 910, 310},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 = 
-  { 910, 610, 310 }   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
-  // { 120, 60, 30 }   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+    // {1690, 1510, 910}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
+    // {1210, 910, 310},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
+    // { 910, 610, 310 }     // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+    {120, 90, 60}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
+    {90, 60, 45},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
+    {60, 45, 30}   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
 };
+
+struct TiemposLavado
+{
+  unsigned long inicioSubEstado;
+  unsigned long inicioTanda;
+  unsigned long inicioDesfogue;
+  unsigned long inicioCentrifugado;
+  unsigned long inicioDesfogueFinal;
+  unsigned long ultimaActualizacion;
+  unsigned long ultimaActualizacionSerial;
+  unsigned long tiempoRestante;
+  bool iniciado; // Flag para controlar la inicialización
+
+  void reset()
+  {
+    inicioSubEstado = 0;
+    inicioTanda = 0;
+    inicioDesfogue = 0;
+    inicioCentrifugado = 0;
+    inicioDesfogueFinal = 0;
+    ultimaActualizacion = millis();
+    ultimaActualizacionSerial = millis();
+    tiempoRestante = 0;
+    iniciado = false;
+  }
+};
+
+struct EstadoPines
+{
+  bool puertaBloqueada;
+  bool giroDerecha;
+  bool giroIzquierda;
+  bool centrifugado;
+  bool ingresoAgua;
+  bool desfogue;
+
+  void reset()
+  {
+    puertaBloqueada = false;
+    giroDerecha = false;
+    giroIzquierda = false;
+    centrifugado = false;
+    ingresoAgua = false;
+    desfogue = true; // Por seguridad, desfogue cerrado por defecto
+  }
+
+  void aplicar()
+  {
+    digitalWrite(BLOQUEAR_PUERTA_PIN, puertaBloqueada);
+    digitalWrite(GIRAR_DERECHA_PIN, giroDerecha);
+    digitalWrite(GIRAR_IZQUIERDA_PIN, giroIzquierda);
+    digitalWrite(CENTRIFUGAR_PIN, centrifugado);
+    digitalWrite(INGRESAR_AGUA_PIN, ingresoAgua);
+    digitalWrite(DESFOGAR_PIN, desfogue);
+  }
+};
+
+struct BanderasProceso
+{
+  bool enProgreso;
+  bool emergencia;
+  bool primeraPausaActiva;
+
+  void reset()
+  {
+    enProgreso = false;
+    emergencia = false;
+    primeraPausaActiva = false;
+  }
+};
+
+// Constantes de timeout y seguridad
+// const unsigned long TIMEOUT_LLENADO = 300000;           // 5 minutos
+// const unsigned long TIMEOUT_DESFOGUE = 180000;          // 3 minutos
+// const unsigned long TIMEOUT_MOTOR = 600000;             // 10 minutos
+// const unsigned long MAX_TIEMPO_DESFOGUE_FINAL = 300000; // 5 minutos máximo
+
+// Variables globales a agregar
+TiemposLavado tiempos;
+EstadoPines pines;
+BanderasProceso banderas;
+bool errorTimeout = false;
 
 // Variables de estado y control
 uint8_t programaSeleccionado = 0;
-uint16_t tiempoRestante = 0;
-bool enProgreso = false;
-bool emergencia = false;
-bool primeraPausaActiva = false;
+// bool banderas.enProgreso = false;
+// bool emergencia = false;
+// bool primeraPausaActiva = false;
+
 String comandoBuffer = "";
 String estadoActual = "";
-unsigned long ultimaActualizacionSerial = 0;
 const uint16_t INTERVALO_ACTUALIZACION_SERIAL = 5000;
-unsigned long tiempoInicioDesfogueFinal = 0;
 
 // Estados del ciclo de lavado
-enum EstadoLavado {
+enum EstadoLavado
+{
   ESPERA,
   TANDA1,
   TANDA2,
   TANDA3,
   CENTRIFUGADO,
-  ESPERA_FINAL,
   DESFOGUE_FINAL
 };
-
 EstadoLavado estadoLavado = ESPERA;
+
+enum SubEstadoTanda
+{
+  LAVADO,
+  DESFOGUE
+};
+SubEstadoTanda subEstado = LAVADO;
 
 // Declaraciones anticipadas de funciones
 void enviarComandoNextion(String comando);
@@ -82,12 +171,35 @@ void procesarCentrifugado();
 void procesarDesfogueFinal();
 void actualizarTiempo();
 void configurarPaginaLavado();
-void toggleEmergencia();
+void activarEmergencia();
 void detenerPrograma();
 void iniciarPrograma();
 
+// bool verificarTimeouts(unsigned long tiempoActual) {
+//   switch (estadoLavado) {
+//     case TANDA1:
+//     case TANDA2:
+//     case TANDA3:
+//       if (subEstadoTanda == LLENADO && (tiempoActual - tiempos.inicioSubEstado > TIMEOUT_LLENADO)) {
+//         return true;
+//       }
+//       if (subEstadoTanda == DESFOGUE && (tiempoActual - tiempos.inicioDesfogue > TIMEOUT_DESFOGUE)) {
+//         return true;
+//       }
+//       break;
+
+//     case CENTRIFUGADO:
+//       if (tiempoActual - tiempos.inicioCentrifugado > TIMEOUT_MOTOR) {
+//         return true;
+//       }
+//       break;
+//   }
+//   return false;
+// }
+
 // Función para enviar comandos al Nextion
-void enviarComandoNextion(String comando) {
+void enviarComandoNextion(String comando)
+{
   Serial.print(comando);
   Serial.write(0xFF);
   Serial.write(0xFF);
@@ -96,7 +208,8 @@ void enviarComandoNextion(String comando) {
 }
 
 // Función para leer el nivel de agua
-bool leerNivelAgua() {
+bool leerNivelAgua()
+{
   int valorADC = analogRead(NIVEL_AGUA_PIN);
 
   // Convertir el valor ADC a voltaje real (antes del divisor)
@@ -104,12 +217,8 @@ bool leerNivelAgua() {
 
   // Para depuración
   static unsigned long ultimoLog = 0;
-  if (millis() - ultimoLog > 1000) {  // Log cada segundo
-    // Serial.print("Valor ADC: ");
-    // Serial.print(valorADC);
-    // Serial.print(" Voltaje: ");
-    // Serial.print(voltajeLeido);
-    // Serial.println("V");
+  if (millis() - ultimoLog > 1000)
+  {
     ultimoLog = millis();
   }
 
@@ -117,199 +226,271 @@ bool leerNivelAgua() {
   return voltajeLeido >= VOLTAJE_NIVEL;
 }
 
-void configurarPaginaLavado() {
-  enviarComandoNextion("b_emergencia.en=0");  // emergencia
-  enviarComandoNextion("b_parar.en=0");  // parar
-  enviarComandoNextion("b_comenzar.en=1");  // comenzar
-}
-
-void actualizarEstadoEnPantalla(String nuevoEstado) {
-  if (nuevoEstado != estadoActual) {
+void actualizarEstadoEnPantalla(String nuevoEstado)
+{
+  if (nuevoEstado != estadoActual)
+  {
     estadoActual = nuevoEstado;
     enviarComandoNextion("estado.txt=\"" + estadoActual + "\"");
   }
 }
 
-void procesarTanda(int numeroTanda) {
-  static enum SubEstadoTanda { LLENADO,
-                               LAVADO,
-                               DESFOGUE } subEstado = LLENADO;
-  static unsigned long tiempoInicioSubEstado = 0;
-  static unsigned long tiempoInicioTanda = 0;
-  static unsigned long tiempoInicioDesfogue = 0;
-  static String estadoAnterior = "";
-
+void procesarTanda(int numeroTanda)
+{
   unsigned long tiempoActual = millis();
   bool nivelLimiteAgua = leerNivelAgua();
+  static String estadoAnterior = "";
 
-  unsigned long tiempoTranscurridoEnCiclo = (tiempoActual - tiempoInicioSubEstado) % (TIEMPO_CICLO_COMPLETO * 1000);
+  // // Debug logging
+  // static unsigned long ultimoLog = 0;
+  // if (tiempoActual - ultimoLog > 1000)
+  // { // Log cada segundo
+  //   Serial.println("Estado: " + String(estadoLavado) +
+  //                  " SubEstado: " + String(subEstado) +
+  //                  " Tiempo restante: " + String(tiempos.tiempoRestante) +
+  //                  " Nivel agua: " + String(nivelLimiteAgua));
+  //   ultimoLog = tiempoActual;
+  // }
 
-  if (tiempoRestante <= 0) {
-    enProgreso = false;
-    estadoLavado = DESFOGUE_FINAL;
-    tiempoInicioDesfogueFinal = tiempoActual;
-    iniciarDesfogueFinal();
-    return;
+  // Inicialización de tiempos si es la primera vez
+  if (tiempos.inicioTanda == 0)
+  {
+    tiempos.inicioTanda = tiempoActual;
+    tiempos.inicioSubEstado = tiempoActual;
+    // Asegurar que empiece con desfogue cerrado y entrada de agua abierta
+    pines.desfogue = true;    // Cerrado
+    pines.ingresoAgua = true; // Abierto
+    pines.aplicar();
   }
 
-  if (subEstado == LLENADO && tiempoInicioTanda == 0) {
-    tiempoInicioTanda = tiempoActual;
-    tiempoInicioSubEstado = tiempoActual;
-    digitalWrite(INGRESAR_AGUA_PIN, HIGH);
-    digitalWrite(DESFOGAR_PIN, HIGH);  // Cerrar desfogue durante llenado
+  enviarComandoNextion("b3.tsw = 0"); // Ocultar botón de volver a lavar
+
+  // Cálculo del tiempo transcurrido en el ciclo actual
+  unsigned long tiempoTranscurridoEnCiclo = (tiempoActual - tiempos.inicioSubEstado) % (TIEMPO_CICLO_COMPLETO * 1000);
+
+  // Verificación de fin de programa
+  if (tiempos.tiempoRestante <= 0)
+  {
+    procesarDesfogueFinal();
+    return;
   }
 
   String estadoActual = "Lavado " + String(numeroTanda) + " - ";
 
-  switch (subEstado) {
-    case LLENADO:
-      if (!nivelLimiteAgua) {
-        digitalWrite(INGRESAR_AGUA_PIN, HIGH);
-        estadoActual += "llenado";
-        
-        // Procesamiento del motor durante el llenado
-        if (tiempoTranscurridoEnCiclo < (TIEMPO_GIRO_DERECHA * 1000)) {
-          digitalWrite(GIRAR_DERECHA_PIN, HIGH);
-          digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-        } else if (tiempoTranscurridoEnCiclo < ((TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO) * 1000)) {
-          digitalWrite(GIRAR_DERECHA_PIN, LOW);
-          digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-        } else if (tiempoTranscurridoEnCiclo < ((TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA) * 1000)) {
-          digitalWrite(GIRAR_DERECHA_PIN, LOW);
-          digitalWrite(GIRAR_IZQUIERDA_PIN, HIGH);
-        } else {
-          digitalWrite(GIRAR_DERECHA_PIN, LOW);
-          digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-        }
-      } else {
-        digitalWrite(INGRESAR_AGUA_PIN, LOW);
+  switch (subEstado)
+  {
+  case LAVADO:
+    // Control del nivel de agua
+    if (nivelLimiteAgua)
+    {
+      pines.ingresoAgua = false;
+      pines.aplicar();
+    }
+
+    // Control de giro del motor
+    if (tiempoTranscurridoEnCiclo < (TIEMPO_GIRO_DERECHA * 1000))
+    {
+      // Giro derecha
+      pines.giroDerecha = true;
+      pines.giroIzquierda = false;
+      estadoActual += "derecha";
+    }
+    else if (tiempoTranscurridoEnCiclo < ((TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO) * 1000))
+    {
+      // Pausa entre giros
+      pines.giroDerecha = false;
+      pines.giroIzquierda = false;
+      estadoActual += "pausa";
+    }
+    else if (tiempoTranscurridoEnCiclo < ((TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA) * 1000))
+    {
+      // Giro izquierda
+      pines.giroDerecha = false;
+      pines.giroIzquierda = true;
+      estadoActual += "izquierda";
+    }
+    else
+    {
+      // Pausa final
+      pines.giroDerecha = false;
+      pines.giroIzquierda = false;
+      estadoActual += "pausa";
+    }
+
+    // Verificar si es tiempo de cambiar a desfogue
+    if (tiempoActual - tiempos.inicioTanda >= (tiemposTanda[programaSeleccionado - 1][numeroTanda - 1] - TIEMPO_DESFOGUE) * 1000)
+    {
+      subEstado = DESFOGUE;
+      tiempos.inicioDesfogue = tiempoActual;
+      tiempos.inicioSubEstado = tiempoActual;
+
+      // Detener motores antes de desfogue
+      pines.giroDerecha = false;
+      pines.giroIzquierda = false;
+      pines.aplicar();
+    }
+    break;
+
+  case DESFOGUE:
+    estadoActual = "Desfogue " + String(numeroTanda);
+
+    if (tiempoActual - tiempos.inicioDesfogue < (TIEMPO_DESFOGUE * 1000))
+    {
+      // Fase de desfogue activo
+      pines.reset();
+      pines.desfogue = false; // Abrir desfogue
+      pines.puertaBloqueada = true;
+      pines.aplicar();
+    }
+    else
+    {
+      // Fin del desfogue - preparar siguiente fase
+      if (numeroTanda < 3)
+      {
+        // Preparar siguiente tanda
+        estadoLavado = (EstadoLavado)((int)estadoLavado + 1);
         subEstado = LAVADO;
-        tiempoInicioSubEstado = tiempoActual;
-      }
-      break;
+        tiempos.inicioTanda = 0; // Se inicializará en la siguiente iteración
+        tiempos.inicioSubEstado = 0;
 
-    case LAVADO:
-      if (tiempoTranscurridoEnCiclo < (TIEMPO_GIRO_DERECHA * 1000)) {
-        digitalWrite(GIRAR_DERECHA_PIN, HIGH);
-        digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-        estadoActual += "derecha";
-      } else if (tiempoTranscurridoEnCiclo < ((TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO) * 1000)) {
-        digitalWrite(GIRAR_DERECHA_PIN, LOW);
-        digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-        estadoActual += "pausa";
-      } else if (tiempoTranscurridoEnCiclo < ((TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA) * 1000)) {
-        digitalWrite(GIRAR_DERECHA_PIN, LOW);
-        digitalWrite(GIRAR_IZQUIERDA_PIN, HIGH);
-        estadoActual += "izquierda";
-      } else {
-        digitalWrite(GIRAR_DERECHA_PIN, LOW);
-        digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-        estadoActual += "pausa";
-      }
+        pines.reset();
+        pines.desfogue = true;    // Cerrar desfogue
+        pines.ingresoAgua = true; // Iniciar nuevo llenado
+        pines.puertaBloqueada = true;
+        pines.aplicar();
 
-      if (tiempoActual - tiempoInicioTanda >= (tiemposTanda[programaSeleccionado - 1][numeroTanda - 1] - TIEMPO_DESFOGUE) * 1000) {
-        subEstado = DESFOGUE;
-        tiempoInicioDesfogue = tiempoActual;
-        digitalWrite(GIRAR_DERECHA_PIN, LOW);
-        digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
+        banderas.enProgreso = true;
       }
-      break;
+      else
+      {
+        // Preparar centrifugado
+        estadoLavado = CENTRIFUGADO;
+        tiempos.inicioTanda = 0;
 
-    case DESFOGUE:
-      estadoActual = "desfogue " + String(numeroTanda);
-      digitalWrite(GIRAR_DERECHA_PIN, LOW);
-      digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
+        pines.reset();
+        pines.desfogue = false; // Mantener desfogue abierto
+        pines.centrifugado = true;
+        pines.puertaBloqueada = true;
+        pines.aplicar();
 
-      if (tiempoActual - tiempoInicioDesfogue < (TIEMPO_DESFOGUE * 1000)) {
-        digitalWrite(DESFOGAR_PIN, LOW);  // Abrir desfogue (nivel bajo)
-      } else {
-        digitalWrite(DESFOGAR_PIN, HIGH);  // Cerrar desfogue (nivel alto)
-        if (numeroTanda < 3) {
-          estadoLavado = (EstadoLavado)((int)estadoLavado + 1);
-          subEstado = LLENADO;
-          tiempoInicioTanda = 0;
-          tiempoInicioSubEstado = 0;
-        } else {
-          estadoLavado = CENTRIFUGADO;
-          tiempoInicioTanda = 0;
-        }
+        banderas.enProgreso = true;
       }
-      break;
+    }
+    break;
   }
 
-  if (estadoActual != estadoAnterior) {
+  // Actualizar estado en pantalla si cambió
+  if (estadoActual != estadoAnterior)
+  {
     actualizarEstadoEnPantalla(estadoActual);
     estadoAnterior = estadoActual;
   }
+
+  // Aplicar cambios en los pines si hubo modificaciones
+  pines.aplicar();
 }
 
-void procesarCentrifugado() {
-  static unsigned long tiempoInicioCentrifugado = 0;
+void procesarCentrifugado()
+{
   unsigned long tiempoActual = millis();
 
-  if (tiempoInicioCentrifugado == 0) {
-    tiempoInicioCentrifugado = tiempoActual;
-    actualizarEstadoEnPantalla("centrifugado");
-    digitalWrite(DESFOGAR_PIN, LOW);  // Mantener desfogue abierto durante centrifugado
+  // Fase de inicio del centrifugado
+  if (tiempos.inicioCentrifugado == 0)
+  {
+    // Verificaciones de seguridad antes de iniciar
+    if (leerNivelAgua())
+    {
+      // Si aún hay agua, mantener desfogue abierto y esperar
+      pines.desfogue = false;
+      pines.centrifugado = false;
+      pines.puertaBloqueada = true;
+      pines.aplicar();
+      return;
+    }
+
+    // Inicialización segura del centrifugado
+    tiempos.inicioCentrifugado = tiempoActual;
+    pines.desfogue = false;       // Mantener desfogue abierto durante centrifugado
+    pines.puertaBloqueada = true; // Asegurar que la puerta esté bloqueada
+    actualizarEstadoEnPantalla("Centrifugado");
   }
 
-  if (tiempoActual - tiempoInicioCentrifugado < (TIEMPO_CENTRIFUGADO * 1000)) {
-    digitalWrite(CENTRIFUGAR_PIN, HIGH);
-    digitalWrite(DESFOGAR_PIN, LOW);  // Asegurar que el desfogue permanezca abierto
-  } else {
-    digitalWrite(CENTRIFUGAR_PIN, LOW);
-    // No cerramos el desfogue aquí, se mantendrá abierto
-    estadoLavado = ESPERA_FINAL;
-    iniciarDesfogueFinal();
-    tiempoInicioCentrifugado = 0;;
+  // Control del proceso de centrifugado
+  if (tiempoActual - tiempos.inicioCentrifugado < (TIEMPO_CENTRIFUGADO * 1000))
+  {
+    // Verificación continua de seguridad
+    if (!banderas.emergencia && !banderas.primeraPausaActiva)
+    {
+      pines.centrifugado = true;
+      pines.desfogue = false; // Mantener desfogue abierto
+      pines.puertaBloqueada = true;
+    }
+    else
+    {
+      pines.centrifugado = false;
+    }
   }
+  else
+  {
+    // Finalización segura del centrifugado
+    pines.centrifugado = false;
+    pines.desfogue = false; // Mantener desfogue abierto para fase final
+
+    // Transición al siguiente estado
+    estadoLavado = DESFOGUE_FINAL;
+    tiempos.inicioDesfogueFinal = tiempoActual;
+    tiempos.inicioCentrifugado = 0;
+
+    // Actualización de la interfaz
+    enviarComandoNextion("page 3");
+    enviarComandoNextion("t0.txt=\"DESFOGUE FINAL\"");
+  }
+
+  // Aplicar todos los cambios de estado
+  pines.aplicar();
 }
 
-void procesarEsperaFinal() {
-  static unsigned long tiempoInicioEspera = 0;
-  unsigned long tiempoActual = millis();
-
-  if (tiempoInicioEspera == 0) {
-    tiempoInicioEspera = tiempoActual;
-    digitalWrite(GIRAR_DERECHA_PIN, LOW);
-    digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-    digitalWrite(CENTRIFUGAR_PIN, LOW);
-    digitalWrite(INGRESAR_AGUA_PIN, LOW);
-    digitalWrite(DESFOGAR_PIN, HIGH);  // Desfogue desactivado (nivel alto)
-    iniciarDesfogueFinal();
-  }
-
-  if (tiempoActual - tiempoInicioEspera >= (TIEMPO_BLOQUEO_FINAL * 1000)) {
-    digitalWrite(DESFOGAR_PIN, LOW);
-    digitalWrite(BLOQUEAR_PUERTA_PIN, LOW);
-    enProgreso = false;
-    estadoLavado = ESPERA;
-    tiempoInicioEspera = 0;
-    enviarComandoNextion("page 1");
-  }
-}
-
-void procesarComandosNextion() {
-  while (Serial.available()) {
+void procesarComandosNextion()
+{
+  while (Serial.available())
+  {
     char c = Serial.read();
-    if (c >= 32 && c <= 126) {
+    if (c >= 32 && c <= 126)
+    {
       comandoBuffer += c;
     }
-    if (c == 0xFF || comandoBuffer.length() > 20) {
-      if (comandoBuffer.length() > 0) {
-        if (comandoBuffer.indexOf("programa") >= 0) {
+    if (c == 0xFF || comandoBuffer.length() > 20)
+    {
+      if (comandoBuffer.length() > 0)
+      {
+        if (comandoBuffer.indexOf("programa") >= 0)
+        {
           programaSeleccionado = comandoBuffer.charAt(comandoBuffer.length() - 1) - '0';
+
           enviarComandoNextion("page 2");
-          configurarPaginaLavado();
-        } else if (comandoBuffer.indexOf("comenzar") >= 0) {
+          enviarComandoNextion("b_emergencia.tsw=0"); // emergencia
+          enviarComandoNextion("b_parar.tsw=0");      // parar
+          enviarComandoNextion("b_comenzar.tsw=1");   // comenzar
+        }
+        else if (comandoBuffer.indexOf("comenzar") >= 0)
+        {
           iniciarPrograma();
-        } else if (comandoBuffer.indexOf("parar") >= 0) {
-          if (enProgreso || primeraPausaActiva) {
+          enviarComandoNextion("b3.tsw = 0"); // Ocultar botón de volver a lavar
+          enviarComandoNextion("btn_comenzar.tsw = 0"); // Ocultar botón de reanudar
+        }
+        else if (comandoBuffer.indexOf("parar") >= 0)
+        {
+          if (banderas.enProgreso || banderas.primeraPausaActiva)
+          {
             detenerPrograma();
+            enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
           }
-        } else if (comandoBuffer.indexOf("emergencia") >= 0) {
-          if (enProgreso || primeraPausaActiva) {
-            toggleEmergencia();
+        }
+        else if (comandoBuffer.indexOf("emergencia") >= 0)
+        {
+          if (banderas.enProgreso || banderas.primeraPausaActiva)
+          {
+            activarEmergencia();
           }
         }
         comandoBuffer = "";
@@ -318,91 +499,165 @@ void procesarComandosNextion() {
   }
 }
 
-void iniciarDesfogueFinal() {
-  // Cambiar a la página de desfogue (página 3)
-  enviarComandoNextion("page 3");
-  actualizarEstadoEnPantalla("Desfogue final");
-}
+void procesarDesfogueFinal()
+{
+  unsigned long tiempoActual = millis();
 
-void iniciarPrograma() {
-  if (primeraPausaActiva) {
-    primeraPausaActiva = false;
-    enProgreso = true;
-    // actualizarEstadoEnPantalla("reanudando");
-  } else {
-    // actualizarEstadoEnPantalla("iniciando");
-    enProgreso = true;
-    emergencia = false;
-    estadoLavado = TANDA1;
-    digitalWrite(BLOQUEAR_PUERTA_PIN, HIGH);
-    digitalWrite(DESFOGAR_PIN, HIGH);  // Cerramos desfogue al iniciar
-    tiempoRestante = calcularTiempoTotal();
-    enviarComandoNextion("tiempo.txt=\"" + formatearTiempo(tiempoRestante) + "\"");
+  // Fase de desfogue activo
+  if (tiempoActual - tiempos.inicioDesfogueFinal < (TIEMPO_BLOQUEO_FINAL * 1000))
+  {
+    // Mantener el estado de desfogue constantemente
+    pines.reset();
+    pines.desfogue = false;       // Mantener desfogue abierto (LOW)
+    pines.puertaBloqueada = true; // Mantener puerta bloqueada
+    pines.aplicar();
   }
+  // Fase de finalización
+  else
+  {
+    tiempos.reset(); // Reiniciar todos los tiempos
+    pines.reset();
+    pines.desfogue = true; // Abrir desfogue
+    pines.aplicar();
 
-  enviarComandoNextion("b_emergencia.en=1");  // emergencia
-  enviarComandoNextion("b_parar.en=1");  // parar
+    estadoLavado = ESPERA;
+    subEstado = LAVADO;
+    banderas.reset();
+
+    programaSeleccionado = 0;
+
+    enviarComandoNextion("page 1");
+    enviarComandoNextion("b3.tsw = 1"); // Mostrar botón de volver a lavar
+  }
 }
 
-void detenerPrograma() {
-  if (!primeraPausaActiva) {
+void iniciarPrograma()
+{
+  // enviarComandoNextion("b3.tsw = 0"); // Deshabilitar pulsacción de botón de vuelta
+
+  if (banderas.primeraPausaActiva)
+  {
+    // Si estamos reanudando desde pausa, solo restauramos las banderas
+    banderas.primeraPausaActiva = false;
+    banderas.enProgreso = true;
+
+    // Restaurar estados de los pines según el estado actual
+    switch (estadoLavado)
+    {
+    case TANDA1:
+    case TANDA2:
+    case TANDA3:
+      if (subEstado == LAVADO)
+      {
+        pines.desfogue = true;                // Cerrar desfogue
+        // pines.ingresoAgua = !leerNivelAgua(); // Solo abrir si falta agua
+      }
+      break;
+    case CENTRIFUGADO:
+      pines.desfogue = false;
+      pines.centrifugado = true;
+      break;
+    }
+    pines.puertaBloqueada = true;
+    pines.aplicar();
+    // enviarComandoNextion("btn_comenzar.tsw = 0"); // Deshabilitar pulsacción de botón en pantalla
+  }
+  else
+  {
+    // Inicio nuevo del programa
+    tiempos.reset();
+    tiempos.inicioTanda = millis();
+    tiempos.inicioSubEstado = millis();
+
+    banderas.enProgreso = true;
+    banderas.emergencia = false;
+    estadoLavado = TANDA1;
+    subEstado = LAVADO;
+
+    pines.reset();
+    pines.puertaBloqueada = true;
+    pines.desfogue = true;    // Cerrar desfogue
+    pines.ingresoAgua = true; // Iniciar llenado
+    pines.aplicar();
+
+    tiempos.tiempoRestante = calcularTiempoTotal();
+    actualizarEstadoEnPantalla("Lavado 1");
+    // enviarComandoNextion("btn_comenzar.tsw = 0");
+  }
+}
+
+void detenerPrograma()
+{
+  if (!banderas.primeraPausaActiva)
+  {
     // Primera vez que se presiona parar
-    primeraPausaActiva = true;
-    enProgreso = false;
+    banderas.primeraPausaActiva = true;
+    banderas.enProgreso = false;
+    banderas.emergencia = false;
 
-    // Detiene los motores y el ingreso de agua
-    digitalWrite(GIRAR_DERECHA_PIN, LOW);
-    digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-    digitalWrite(CENTRIFUGAR_PIN, LOW);
-    digitalWrite(INGRESAR_AGUA_PIN, LOW);
+    pines.reset();
+    pines.desfogue = true;
+    pines.puertaBloqueada = true;
+    pines.aplicar();
     actualizarEstadoEnPantalla("Pausado");
-  } else {
+    enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
+  }
+  else
+  {
     // Segunda vez que se presiona parar
-    primeraPausaActiva = false;
-    enProgreso = false;
-    emergencia = false;
+    // uint8_t programaAnterior = programaSeleccionado;
+    // tiempos.reset();
+    pines.reset();
+    pines.desfogue = false;
+    pines.puertaBloqueada = true;
+    pines.aplicar();
 
-    // Detener motores e ingreso de agua
-    digitalWrite(GIRAR_DERECHA_PIN, LOW);
-    digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-    digitalWrite(CENTRIFUGAR_PIN, LOW);
-    digitalWrite(INGRESAR_AGUA_PIN, LOW);
+    banderas.emergencia = false;
+    banderas.enProgreso = true;
+    banderas.primeraPausaActiva = false;
+    errorTimeout = false;
 
     // Iniciar proceso de desfogue final
     estadoLavado = DESFOGUE_FINAL;
-    tiempoInicioDesfogueFinal = millis();
-    digitalWrite(DESFOGAR_PIN, LOW);  // Activar desfogue (nivel bajo)
+    tiempos.inicioDesfogueFinal = millis();
+
+    // Restaurar el programa seleccionado
+    // programaSeleccionado = programaAnterior;
 
     // Cambiar a página de desfogue
-    iniciarDesfogueFinal();
+    enviarComandoNextion("page 3");
+    enviarComandoNextion("t0.txt=\"DETENIDO\"");
   }
 }
 
-void toggleEmergencia() {
-  // Detener motores e ingreso de agua
-  digitalWrite(GIRAR_DERECHA_PIN, LOW);
-  digitalWrite(GIRAR_IZQUIERDA_PIN, LOW);
-  digitalWrite(CENTRIFUGAR_PIN, LOW);
-  digitalWrite(INGRESAR_AGUA_PIN, LOW);
+void activarEmergencia()
+{
+  // tiempos.reset();
+  pines.reset();
+  pines.desfogue = false;
+  pines.puertaBloqueada = true;
+  pines.aplicar();
 
-  // Restablecer variables de estado
-  emergencia = false;
-  enProgreso = false;
-  primeraPausaActiva = false;
+  banderas.emergencia = true;
+  banderas.enProgreso = false;
+  banderas.primeraPausaActiva = false;
+  // errorTimeout = false;
 
-  // Iniciar proceso de desfogue final
   estadoLavado = DESFOGUE_FINAL;
-  tiempoInicioDesfogueFinal = millis();
-  // digitalWrite(DESFOGAR_PIN, HIGH);
+  subEstado = LAVADO;
+  tiempos.inicioDesfogueFinal = millis();
 
-  // Cambiar a página de desfogue
-  iniciarDesfogueFinal();
+  // Asegurar que volvemos a la página correcta después de la banderas.emergencia
+  enviarComandoNextion("page 3");
+  enviarComandoNextion("t0.txt=\"EMERGENCIA\"");
 }
 
-uint16_t calcularTiempoTotal() {
+uint16_t calcularTiempoTotal()
+{
   int total = 0;
   // Suma de tiempos de cada tanda (que ya incluyen sus desfogues)
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     total += tiemposTanda[programaSeleccionado - 1][i];
   }
   // Agregar solo el tiempo de centrifugado
@@ -410,64 +665,83 @@ uint16_t calcularTiempoTotal() {
   return total;
 }
 
-void actualizarTiempo() {
-  static unsigned long ultimaActualizacion = 0;
+void actualizarTiempo()
+{
   unsigned long ahora = millis();
-  bool nivelAgua = leerNivelAgua();
 
-  // Verificamos si ha pasado 1 segundo desde la última actualización
-  if (enProgreso && !emergencia && !primeraPausaActiva && 
-      (ahora - ultimaActualizacion) >= 1000) {
-    
-    // Solo actualizamos el tiempo si el nivel de agua es adecuado
-    // if (!nivelAgua) {
-      if (tiempoRestante > 0) {
-        tiempoRestante--;
-        // Actualizamos el display con el nuevo tiempo formateado
-        String tiempoFormateado = formatearTiempo(tiempoRestante);
-        enviarComandoNextion("tiempo.txt=\"" + tiempoFormateado + "\"");
+  // Protección contra desbordamiento mejorada
+  if (ahora < tiempos.ultimaActualizacion)
+  {
+    unsigned long diferencia = ULONG_MAX - tiempos.ultimaActualizacion + ahora;
+    if (diferencia >= 1000)
+    {
+      tiempos.tiempoRestante--;
+    }
+    tiempos.ultimaActualizacion = ahora;
+    tiempos.ultimaActualizacionSerial = ahora;
+    return;
+  }
+
+  // Verificación de estado completa
+  if (banderas.enProgreso && !banderas.emergencia && !banderas.primeraPausaActiva && !errorTimeout)
+  {
+    if ((ahora - tiempos.ultimaActualizacion) >= 1000)
+    {
+      if (tiempos.tiempoRestante > 0)
+      {
+        tiempos.tiempoRestante--;
+        char buffer[10];
+        snprintf(buffer, sizeof(buffer), "%02d:%02d",
+                 tiempos.tiempoRestante / 60, tiempos.tiempoRestante % 60);
+        enviarComandoNextion("tiempo.txt=\"" + String(buffer) + "\"");
       }
-    // }
-    
-    // Actualizamos el timestamp de la última actualización
-    ultimaActualizacion = ahora;
-    
-    // Actualización del serial si es necesario
-    if (ahora - ultimaActualizacionSerial >= INTERVALO_ACTUALIZACION_SERIAL) {
-      ultimaActualizacionSerial = ahora;
+      tiempos.ultimaActualizacion = ahora;
+
+      // Logging cada 5 segundos
+      if ((ahora - tiempos.ultimaActualizacionSerial) >= INTERVALO_ACTUALIZACION_SERIAL)
+      {
+        tiempos.ultimaActualizacionSerial = ahora;
+        // Implementar logging significativo aquí
+      }
     }
   }
 }
 
-void procesarDesfogueFinal() {
-  unsigned long tiempoActual = millis();
-
-  if (tiempoActual - tiempoInicioDesfogueFinal < (TIEMPO_BLOQUEO_FINAL * 1000)) {
-    digitalWrite(DESFOGAR_PIN, LOW);  // Mantener desfogue abierto
-  } else {
-    // Al terminar el tiempo de desfogue, mantenemos el desfogue abierto
-    digitalWrite(DESFOGAR_PIN, LOW);  // Mantener desfogue abierto
-    estadoLavado = ESPERA;
-    tiempoInicioDesfogueFinal = 0;
-
-    enviarComandoNextion("page 1");
-    digitalWrite(BLOQUEAR_PUERTA_PIN, LOW);
-    actualizarEstadoEnPantalla("espera");
-  }
-}
-
-String formatearTiempo(uint16_t segundos) {
-  uint8_t minutos = segundos / 60;
+String formatearTiempo(uint16_t segundos)
+{
+  uint16_t minutos = segundos / 60;
   uint8_t segs = segundos % 60;
-  return String(minutos) + ":" + (segs < 10 ? "0" : "") + String(segs);
+  // Asegurar formato MM:SS con ceros a la izquierda
+  return (minutos < 10 ? "0" : "") + String(minutos) + ":" + (segs < 10 ? "0" : "") + String(segs);
 }
 
-void setup() {
+bool verificarSeguridadPuerta()
+{
+  // La puerta solo debe desbloquearse cuando:
+  // 1. El programa no está en progreso
+  // 2. No hay agua en la lavadora
+  // 3. No hay movimiento de motor
+
+  if (banderas.enProgreso ||
+      leerNivelAgua() ||
+      digitalRead(GIRAR_DERECHA_PIN) == HIGH ||
+      digitalRead(GIRAR_IZQUIERDA_PIN) == HIGH ||
+      digitalRead(CENTRIFUGAR_PIN) == HIGH)
+  {
+
+    digitalWrite(BLOQUEAR_PUERTA_PIN, HIGH);
+    return false;
+  }
+  return true;
+}
+
+void setup()
+{
   Serial.begin(9600);
   // Serial.begin(9600, SERIAL_8N1, RX_PIN, TX_PIN);
   analogReadResolution(RESOLUCION_ADC);
 
-  pinMode(BTN_EMERGENCIA_PIN, INPUT_PULLUP);  // activo en nivel bajo
+  pinMode(BTN_EMERGENCIA_PIN, INPUT_PULLUP); // Botón de emergencia
   pinMode(BLOQUEAR_PUERTA_PIN, OUTPUT);
   pinMode(GIRAR_DERECHA_PIN, OUTPUT);
   pinMode(GIRAR_IZQUIERDA_PIN, OUTPUT);
@@ -476,43 +750,57 @@ void setup() {
   pinMode(DESFOGAR_PIN, OUTPUT);
 
   enviarComandoNextion("page 0");
+  tiempos.ultimaActualizacion = millis(); // Inicialización correcta
+  tiempos.ultimaActualizacionSerial = millis();
+  // Agregar después del código actual de setup
+  pines.reset();
+  pines.aplicar();
+  banderas.reset();
+  tiempos.reset();
 }
 
-void loop() {
-  // Revisar el botón físico de emergencia
-  static bool lastBtnState = HIGH;
+void loop()
+{
+  // Revisar el botón físico de banderas.emergencia
+  static bool lastBtnState = HIGH; // Estado anterior del botón
   bool currentBtnState = digitalRead(BTN_EMERGENCIA_PIN);
 
-  if (currentBtnState == LOW && lastBtnState == HIGH && (enProgreso || primeraPausaActiva)) {
-    toggleEmergencia();
+  if (currentBtnState == LOW && lastBtnState == HIGH && (banderas.enProgreso || banderas.primeraPausaActiva)) // Botón presionado
+  {
+    activarEmergencia();
   }
   lastBtnState = currentBtnState;
+
+  // if (!verificarSeguridadPuerta())
+  // {
+  //   digitalWrite(BLOQUEAR_PUERTA_PIN, HIGH);
+  // }
 
   procesarComandosNextion();
 
   // Actualizar el tiempo siempre, independientemente del estado
   actualizarTiempo();
 
-  if (enProgreso && !emergencia) {
-    switch (estadoLavado) {
-      case ESPERA:
-        actualizarEstadoEnPantalla("espera");
-        break;
-      case TANDA1:
-      case TANDA2:
-      case TANDA3:
-        procesarTanda(estadoLavado - TANDA1 + 1);
-        break;
-      case CENTRIFUGADO:
-        procesarCentrifugado();
-        break;
-      case ESPERA_FINAL:
-        procesarEsperaFinal();
-        break;
+  if (banderas.enProgreso && !banderas.emergencia)
+  {
+    switch (estadoLavado)
+    {
+    case ESPERA:
+      // actualizarEstadoEnPantalla("Espera");
+      break;
+    case TANDA1:
+    case TANDA2:
+    case TANDA3:
+      procesarTanda(estadoLavado - TANDA1 + 1);
+      break;
+    case CENTRIFUGADO:
+      procesarCentrifugado();
+      break;
     }
   }
 
-  if (estadoLavado == DESFOGUE_FINAL) {
+  if (estadoLavado == DESFOGUE_FINAL)
+  {
     procesarDesfogueFinal();
   }
 }
