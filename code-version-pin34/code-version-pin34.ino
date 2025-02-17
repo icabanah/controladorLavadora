@@ -1,5 +1,4 @@
 // #include <HardwareSerial.h>
-
 // HardwareSerial Serial(2);
 
 // Configuración de pines
@@ -25,7 +24,7 @@ const uint16_t VALOR_MAX_ADC = 4095;   // Valor máximo del ADC (2^12 - 1)
 const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 
 // Tiempos en segundos para control de motor
-const uint8_t TIEMPO_GIRO_DERECHA = 180;  // 180 segundos
+const uint8_t TIEMPO_GIRO_DERECHA = 180; // 180 segundos
 const uint8_t TIEMPO_GIRO_IZQUIERDA = 180;
 const uint8_t TIEMPO_PAUSA_GIRO = 60;
 // const uint8_t TIEMPO_GIRO_DERECHA = 5;
@@ -34,9 +33,9 @@ const uint8_t TIEMPO_PAUSA_GIRO = 60;
 const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA + TIEMPO_PAUSA_GIRO;
 
 // Tiempos fijos para procesos específicos
-const uint8_t TIEMPO_DESFOGUE = 120; // 2 minutos
-const uint16_t TIEMPO_CENTRIFUGADO = 420;  // 7*60
-const uint8_t TIEMPO_BLOQUEO_FINAL = 120;  // 2*60
+const uint8_t TIEMPO_DESFOGUE = 120;      // 2 minutos
+const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
+const uint8_t TIEMPO_BLOQUEO_FINAL = 120; // 2*60
 // const uint8_t TIEMPO_DESFOGUE = 5;
 // const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
 // const uint8_t TIEMPO_BLOQUEO_FINAL = 5; // 2*60
@@ -45,10 +44,10 @@ const uint8_t TIEMPO_BLOQUEO_FINAL = 120;  // 2*60
 const uint16_t tiemposTanda[3][3] = {
     {1690, 1510, 910}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
     {1210, 910, 310},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
-    { 910, 610, 310 }     // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
-    // {120, 90, 60}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
-    // {90, 60, 45},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
-    // {60, 45, 30}   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+    {910, 610, 310}    // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+                       // {120, 90, 60}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
+                       // {90, 60, 45},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
+                       // {60, 45, 30}   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
 };
 
 // Constantes de timeout y seguridad (en millisegundos)
@@ -154,9 +153,6 @@ bool errorTimeout = false;
 
 // Variables de estado y control
 uint8_t programaSeleccionado = 0;
-// bool banderas.enProgreso = false;
-// bool emergencia = false;
-// bool primeraPausaActiva = false;
 
 String comandoBuffer = "";
 String estadoActual = "";
@@ -256,7 +252,7 @@ bool verificarTimeouts()
 
   return timeout;
 }
-// Función para enviar comandos al Nextion
+
 void enviarComandoNextion(String comando)
 {
   Serial.print(comando);
@@ -266,7 +262,6 @@ void enviarComandoNextion(String comando)
   // delay(10);
 }
 
-// Función para leer el nivel de agua
 bool leerNivelAgua()
 {
   int valorADC = analogRead(NIVEL_AGUA_PIN);
@@ -854,11 +849,6 @@ void loop()
     activarEmergencia("EMEGENCIA");
   }
   lastBtnState = currentBtnState;
-
-  // if (!verificarSeguridadPuerta())
-  // {
-  //   digitalWrite(BLOQUEAR_PUERTA_PIN, HIGH);
-  // }
 
   procesarComandosNextion();
 
