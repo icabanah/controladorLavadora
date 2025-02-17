@@ -25,31 +25,56 @@ const uint16_t VALOR_MAX_ADC = 4095;   // Valor máximo del ADC (2^12 - 1)
 const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 
 // Tiempos en segundos para control de motor
-// const uint8_t TIEMPO_GIRO_DERECHA = 180;  // 180 segundos
-// const uint8_t TIEMPO_GIRO_IZQUIERDA = 180;
-// const uint8_t TIEMPO_PAUSA_GIRO = 60;
-const uint8_t TIEMPO_GIRO_DERECHA = 5;
-const uint8_t TIEMPO_GIRO_IZQUIERDA = 5;
-const uint8_t TIEMPO_PAUSA_GIRO = 3;
+const uint8_t TIEMPO_GIRO_DERECHA = 180;  // 180 segundos
+const uint8_t TIEMPO_GIRO_IZQUIERDA = 180;
+const uint8_t TIEMPO_PAUSA_GIRO = 60;
+// const uint8_t TIEMPO_GIRO_DERECHA = 5;
+// const uint8_t TIEMPO_GIRO_IZQUIERDA = 5;
+// const uint8_t TIEMPO_PAUSA_GIRO = 3;
 const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA + TIEMPO_PAUSA_GIRO;
 
 // Tiempos fijos para procesos específicos
-// const uint8_t TIEMPO_DESFOGUE = 120;
-// const uint16_t TIEMPO_CENTRIFUGADO = 420;  // 7*60
-// const uint8_t TIEMPO_BLOQUEO_FINAL = 120;  // 2*60
-const uint8_t TIEMPO_DESFOGUE = 5;
-const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
-const uint8_t TIEMPO_BLOQUEO_FINAL = 5; // 2*60
+const uint8_t TIEMPO_DESFOGUE = 120; // 2 minutos
+const uint16_t TIEMPO_CENTRIFUGADO = 420;  // 7*60
+const uint8_t TIEMPO_BLOQUEO_FINAL = 120;  // 2*60
+// const uint8_t TIEMPO_DESFOGUE = 5;
+// const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
+// const uint8_t TIEMPO_BLOQUEO_FINAL = 5; // 2*60
 
 // Tiempos de cada tanda en segundos (ya incluyen su tiempo de desfogue)
 const uint16_t tiemposTanda[3][3] = {
-    // {1690, 1510, 910}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
-    // {1210, 910, 310},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
-    // { 910, 610, 310 }     // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
-    {120, 90, 60}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
-    {90, 60, 45},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
-    {60, 45, 30}   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+    {1690, 1510, 910}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
+    {1210, 910, 310},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
+    { 910, 610, 310 }     // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+    // {120, 90, 60}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
+    // {90, 60, 45},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
+    // {60, 45, 30}   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
 };
+
+// Constantes de timeout y seguridad (en millisegundos)
+const unsigned long TIMEOUT_LLENADO = 300000;           // 5 minutos máximo de llenado
+const unsigned long TIMEOUT_DESFOGUE = 240000;          // 3 minutos máximo de desfogue
+const unsigned long TIMEOUT_MOTOR = 600000;             // 10 minutos máximo de centrifugado
+const unsigned long MAX_TIEMPO_DESFOGUE_FINAL = 300000; // 5 minutos máximo de desfogue final
+
+// Estructura para manejar timeouts
+struct TimeoutControl
+{
+  bool errorTimeout;
+  unsigned long inicioOperacion;
+
+  void iniciarTimeout()
+  {
+    errorTimeout = false;
+    inicioOperacion = millis();
+  }
+
+  bool verificarTimeout(unsigned long limiteTimeout)
+  {
+    return (millis() - inicioOperacion) > limiteTimeout;
+  }
+};
+TimeoutControl controlTimeout;
 
 struct TiemposLavado
 {
@@ -121,12 +146,6 @@ struct BanderasProceso
   }
 };
 
-// Constantes de timeout y seguridad
-// const unsigned long TIMEOUT_LLENADO = 300000;           // 5 minutos
-// const unsigned long TIMEOUT_DESFOGUE = 180000;          // 3 minutos
-// const unsigned long TIMEOUT_MOTOR = 600000;             // 10 minutos
-// const unsigned long MAX_TIEMPO_DESFOGUE_FINAL = 300000; // 5 minutos máximo
-
 // Variables globales a agregar
 TiemposLavado tiempos;
 EstadoPines pines;
@@ -171,32 +190,72 @@ void procesarCentrifugado();
 void procesarDesfogueFinal();
 void actualizarTiempo();
 void configurarPaginaLavado();
-void activarEmergencia();
+void activarEmergencia(String mensaje);
 void detenerPrograma();
 void iniciarPrograma();
 
-// bool verificarTimeouts(unsigned long tiempoActual) {
-//   switch (estadoLavado) {
-//     case TANDA1:
-//     case TANDA2:
-//     case TANDA3:
-//       if (subEstadoTanda == LLENADO && (tiempoActual - tiempos.inicioSubEstado > TIMEOUT_LLENADO)) {
-//         return true;
-//       }
-//       if (subEstadoTanda == DESFOGUE && (tiempoActual - tiempos.inicioDesfogue > TIMEOUT_DESFOGUE)) {
-//         return true;
-//       }
-//       break;
+bool verificarTimeouts()
+{
+  unsigned long tiempoActual = millis();
+  bool timeout = false;
+  String mensajeError = "";
 
-//     case CENTRIFUGADO:
-//       if (tiempoActual - tiempos.inicioCentrifugado > TIMEOUT_MOTOR) {
-//         return true;
-//       }
-//       break;
-//   }
-//   return false;
-// }
+  switch (estadoLavado)
+  {
+  case TANDA1:
+  case TANDA2:
+  case TANDA3:
+    if (subEstado == LAVADO && !leerNivelAgua())
+    {
+      // Verificar timeout de llenado
+      if (pines.ingresoAgua && controlTimeout.verificarTimeout(TIMEOUT_LLENADO))
+      {
+        timeout = true;
+        mensajeError = "Timeout Llenado";
+        // actualizarEstadoEnPantalla("Timeout Llenado");
+      }
+    }
+    else if (subEstado == DESFOGUE)
+    {
+      // Verificar timeout de desfogue
+      if (!pines.desfogue && controlTimeout.verificarTimeout(TIMEOUT_DESFOGUE))
+      {
+        timeout = true;
+        mensajeError = "Timeout Desfogue";
+        // actualizarEstadoEnPantalla("Timeout Desfogue");
+      }
+    }
+    break;
 
+  case CENTRIFUGADO:
+    // Verificar timeout de motor en centrifugado
+    if (pines.centrifugado && controlTimeout.verificarTimeout(TIMEOUT_MOTOR))
+    {
+      timeout = true;
+      mensajeError = "Timeout Motor";
+      // actualizarEstadoEnPantalla("Timeout Motor");
+    }
+    break;
+
+  case DESFOGUE_FINAL:
+    // Verificar timeout de desfogue final
+    if (!pines.desfogue && controlTimeout.verificarTimeout(MAX_TIEMPO_DESFOGUE_FINAL))
+    {
+      timeout = true;
+      mensajeError = "Timeout Desfogue";
+      // actualizarEstadoEnPantalla("Error: Timeout Desfogue Final");
+    }
+    break;
+  }
+
+  if (timeout)
+  {
+    controlTimeout.errorTimeout = true;
+    activarEmergencia(mensajeError);
+  }
+
+  return timeout;
+}
 // Función para enviar comandos al Nextion
 void enviarComandoNextion(String comando)
 {
@@ -257,13 +316,30 @@ void procesarTanda(int numeroTanda)
   {
     tiempos.inicioTanda = tiempoActual;
     tiempos.inicioSubEstado = tiempoActual;
+
+    controlTimeout.iniciarTimeout(); // Iniciar timeout para el nuevo estado
+
     // Asegurar que empiece con desfogue cerrado y entrada de agua abierta
     pines.desfogue = true;    // Cerrado
     pines.ingresoAgua = true; // Abierto
     pines.aplicar();
   }
 
-  enviarComandoNextion("b3.tsw = 0"); // Ocultar botón de volver a lavar
+  // Al cambiar de subEstado
+  if (subEstado == LAVADO && tiempoActual - tiempos.inicioTanda >=
+                                 (tiemposTanda[programaSeleccionado - 1][numeroTanda - 1] - TIEMPO_DESFOGUE) * 1000)
+  {
+    subEstado = DESFOGUE;
+    tiempos.inicioDesfogue = tiempoActual;
+    tiempos.inicioSubEstado = tiempoActual;
+    controlTimeout.iniciarTimeout(); // Reiniciar timeout para desfogue
+
+    pines.giroDerecha = false;
+    pines.giroIzquierda = false;
+    pines.aplicar();
+  }
+
+  // enviarComandoNextion("b3.tsw = 0"); // Ocultar botón de volver a lavar
 
   // Cálculo del tiempo transcurrido en el ciclo actual
   unsigned long tiempoTranscurridoEnCiclo = (tiempoActual - tiempos.inicioSubEstado) % (TIEMPO_CICLO_COMPLETO * 1000);
@@ -397,15 +473,23 @@ void procesarCentrifugado()
   // Fase de inicio del centrifugado
   if (tiempos.inicioCentrifugado == 0)
   {
-    // Verificaciones de seguridad antes de iniciar
-    if (leerNivelAgua())
+    if (tiempos.inicioCentrifugado == 0)
     {
-      // Si aún hay agua, mantener desfogue abierto y esperar
+      if (leerNivelAgua())
+      {
+        pines.desfogue = false;
+        pines.centrifugado = false;
+        pines.puertaBloqueada = true;
+        pines.aplicar();
+        return;
+      }
+
+      tiempos.inicioCentrifugado = tiempoActual;
+      controlTimeout.iniciarTimeout(); // Iniciar timeout para centrifugado
+
       pines.desfogue = false;
-      pines.centrifugado = false;
       pines.puertaBloqueada = true;
-      pines.aplicar();
-      return;
+      actualizarEstadoEnPantalla("Centrifugado");
     }
 
     // Inicialización segura del centrifugado
@@ -475,7 +559,7 @@ void procesarComandosNextion()
         else if (comandoBuffer.indexOf("comenzar") >= 0)
         {
           iniciarPrograma();
-          enviarComandoNextion("b3.tsw = 0"); // Ocultar botón de volver a lavar
+          enviarComandoNextion("b3.tsw = 0");           // Ocultar botón de volver a lavar
           enviarComandoNextion("btn_comenzar.tsw = 0"); // Ocultar botón de reanudar
         }
         else if (comandoBuffer.indexOf("parar") >= 0)
@@ -484,13 +568,15 @@ void procesarComandosNextion()
           {
             detenerPrograma();
             enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
+            enviarComandoNextion("b3.tsw = 1");           // Mostrar botón de volver a lavar
           }
         }
         else if (comandoBuffer.indexOf("emergencia") >= 0)
         {
           if (banderas.enProgreso || banderas.primeraPausaActiva)
           {
-            activarEmergencia();
+            activarEmergencia("EMEGENCIA");
+            enviarComandoNextion("b3.tsw = 1"); // Mostrar botón de volver a lavar
           }
         }
         comandoBuffer = "";
@@ -503,31 +589,34 @@ void procesarDesfogueFinal()
 {
   unsigned long tiempoActual = millis();
 
-  // Fase de desfogue activo
+  // Si es la primera vez que entramos al desfogue final
+  if (tiempos.inicioDesfogueFinal == 0)
+  {
+    tiempos.inicioDesfogueFinal = tiempoActual;
+    controlTimeout.iniciarTimeout(); // Iniciar timeout para desfogue final
+  }
+
   if (tiempoActual - tiempos.inicioDesfogueFinal < (TIEMPO_BLOQUEO_FINAL * 1000))
   {
-    // Mantener el estado de desfogue constantemente
     pines.reset();
-    pines.desfogue = false;       // Mantener desfogue abierto (LOW)
-    pines.puertaBloqueada = true; // Mantener puerta bloqueada
+    pines.desfogue = false;
+    pines.puertaBloqueada = true;
     pines.aplicar();
   }
-  // Fase de finalización
   else
   {
-    tiempos.reset(); // Reiniciar todos los tiempos
+    tiempos.reset();
     pines.reset();
-    pines.desfogue = true; // Abrir desfogue
+    pines.desfogue = true;
     pines.aplicar();
 
     estadoLavado = ESPERA;
     subEstado = LAVADO;
     banderas.reset();
-
     programaSeleccionado = 0;
 
     enviarComandoNextion("page 1");
-    enviarComandoNextion("b3.tsw = 1"); // Mostrar botón de volver a lavar
+    enviarComandoNextion("b3.tsw = 1");
   }
 }
 
@@ -540,6 +629,7 @@ void iniciarPrograma()
     // Si estamos reanudando desde pausa, solo restauramos las banderas
     banderas.primeraPausaActiva = false;
     banderas.enProgreso = true;
+    controlTimeout.iniciarTimeout(); // Reiniciar timeout al reanudar
 
     // Restaurar estados de los pines según el estado actual
     switch (estadoLavado)
@@ -549,7 +639,7 @@ void iniciarPrograma()
     case TANDA3:
       if (subEstado == LAVADO)
       {
-        pines.desfogue = true;                // Cerrar desfogue
+        pines.desfogue = true; // Cerrar desfogue
         // pines.ingresoAgua = !leerNivelAgua(); // Solo abrir si falta agua
       }
       break;
@@ -568,6 +658,7 @@ void iniciarPrograma()
     tiempos.reset();
     tiempos.inicioTanda = millis();
     tiempos.inicioSubEstado = millis();
+    controlTimeout.iniciarTimeout(); // Iniciar timeout para nuevo programa
 
     banderas.enProgreso = true;
     banderas.emergencia = false;
@@ -590,23 +681,20 @@ void detenerPrograma()
 {
   if (!banderas.primeraPausaActiva)
   {
-    // Primera vez que se presiona parar
     banderas.primeraPausaActiva = true;
     banderas.enProgreso = false;
     banderas.emergencia = false;
+    // No reiniciamos el timeout aquí ya que el programa está pausado
 
     pines.reset();
     pines.desfogue = true;
     pines.puertaBloqueada = true;
     pines.aplicar();
     actualizarEstadoEnPantalla("Pausado");
-    enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
+    enviarComandoNextion("btn_comenzar.tsw = 1");
   }
   else
   {
-    // Segunda vez que se presiona parar
-    // uint8_t programaAnterior = programaSeleccionado;
-    // tiempos.reset();
     pines.reset();
     pines.desfogue = false;
     pines.puertaBloqueada = true;
@@ -617,20 +705,16 @@ void detenerPrograma()
     banderas.primeraPausaActiva = false;
     errorTimeout = false;
 
-    // Iniciar proceso de desfogue final
     estadoLavado = DESFOGUE_FINAL;
     tiempos.inicioDesfogueFinal = millis();
+    controlTimeout.iniciarTimeout(); // Iniciar timeout para desfogue final
 
-    // Restaurar el programa seleccionado
-    // programaSeleccionado = programaAnterior;
-
-    // Cambiar a página de desfogue
     enviarComandoNextion("page 3");
     enviarComandoNextion("t0.txt=\"DETENIDO\"");
   }
 }
 
-void activarEmergencia()
+void activarEmergencia(String mensaje = "EMERGENCIA")
 {
   // tiempos.reset();
   pines.reset();
@@ -641,7 +725,7 @@ void activarEmergencia()
   banderas.emergencia = true;
   banderas.enProgreso = false;
   banderas.primeraPausaActiva = false;
-  // errorTimeout = false;
+  errorTimeout = false;
 
   estadoLavado = DESFOGUE_FINAL;
   subEstado = LAVADO;
@@ -649,7 +733,7 @@ void activarEmergencia()
 
   // Asegurar que volvemos a la página correcta después de la banderas.emergencia
   enviarComandoNextion("page 3");
-  enviarComandoNextion("t0.txt=\"EMERGENCIA\"");
+  enviarComandoNextion("t0.txt=\"" + mensaje + "\"");
 }
 
 uint16_t calcularTiempoTotal()
@@ -767,7 +851,7 @@ void loop()
 
   if (currentBtnState == LOW && lastBtnState == HIGH && (banderas.enProgreso || banderas.primeraPausaActiva)) // Botón presionado
   {
-    activarEmergencia();
+    activarEmergencia("EMEGENCIA");
   }
   lastBtnState = currentBtnState;
 
@@ -783,6 +867,11 @@ void loop()
 
   if (banderas.enProgreso && !banderas.emergencia)
   {
+    if (verificarTimeouts())
+    {
+      return;
+    }
+
     switch (estadoLavado)
     {
     case ESPERA:
