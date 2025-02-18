@@ -189,6 +189,7 @@ void iniciarDesfogueFinal();
 void procesarTanda(int numeroTanda);
 void procesarCentrifugado();
 void procesarDesfogueFinal();
+void procesarDetenimiento();
 void actualizarTiempo();
 void configurarPaginaLavado();
 void activarEmergencia(String mensaje);
@@ -938,7 +939,7 @@ void loop()
     procesarDesfogueFinal();
   }
 
-  if (estadoLavado == DETENIDO)
+  if (estadoLavado == DETENIMIENTO)
   {
     procesarDetenimiento();
   }
