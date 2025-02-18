@@ -36,6 +36,7 @@ const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO +
 const uint8_t TIEMPO_DESFOGUE = 120;      // 2 minutos
 const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
 const uint8_t TIEMPO_BLOQUEO_FINAL = 120; // 2*60
+const uint8_t TIEMPO_DETENIDO = 5; // 5 segundos
 // const uint8_t TIEMPO_DESFOGUE = 5;
 // const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
 // const uint8_t TIEMPO_BLOQUEO_FINAL = 5; // 2*60
@@ -55,6 +56,7 @@ const unsigned long TIMEOUT_LLENADO = 300000;           // 5 minutos máximo de 
 const unsigned long TIMEOUT_DESFOGUE = 240000;          // 3 minutos máximo de desfogue
 const unsigned long TIMEOUT_MOTOR = 600000;             // 10 minutos máximo de centrifugado
 const unsigned long MAX_TIEMPO_DESFOGUE_FINAL = 300000; // 5 minutos máximo de desfogue final
+const unsigned long MAX_TIEMPO_DETENIMIENTO = 60000; // 1 minuto máximo de desfogue final
 
 // Estructura para manejar timeouts
 struct TimeoutControl
@@ -82,6 +84,7 @@ struct TiemposLavado
   unsigned long inicioDesfogue;
   unsigned long inicioCentrifugado;
   unsigned long inicioDesfogueFinal;
+  unsigned long inicioDetenimiento;
   unsigned long ultimaActualizacion;
   unsigned long ultimaActualizacionSerial;
   unsigned long tiempoRestante;
@@ -94,6 +97,7 @@ struct TiemposLavado
     inicioDesfogue = 0;
     inicioCentrifugado = 0;
     inicioDesfogueFinal = 0;
+    inicioDetenimiento = 0;
     ultimaActualizacion = millis();
     ultimaActualizacionSerial = millis();
     tiempoRestante = 0;
@@ -166,7 +170,8 @@ enum EstadoLavado
   TANDA2,
   TANDA3,
   CENTRIFUGADO,
-  DESFOGUE_FINAL
+  DESFOGUE_FINAL,
+  DETENIMIENTO
 };
 EstadoLavado estadoLavado = ESPERA;
 
@@ -239,6 +244,16 @@ bool verificarTimeouts()
     {
       timeout = true;
       mensajeError = "Timeout Desfogue";
+      // actualizarEstadoEnPantalla("Error: Timeout Desfogue Final");
+    }
+    break;
+
+  case DETENIMIENTO:
+    // Verificar timeout de desfogue final
+    if (!pines.desfogue && controlTimeout.verificarTimeout(MAX_TIEMPO_DETENIMIENTO))
+    {
+      timeout = true;
+      mensajeError = "Timeout detenimiento";
       // actualizarEstadoEnPantalla("Error: Timeout Desfogue Final");
     }
     break;
@@ -553,25 +568,29 @@ void procesarComandosNextion()
         }
         else if (comandoBuffer.indexOf("comenzar") >= 0)
         {
-          iniciarPrograma();
+          enviarComandoNextion("page 2");
           enviarComandoNextion("b3.tsw = 0");           // Ocultar botón de volver a lavar
           enviarComandoNextion("btn_comenzar.tsw = 0"); // Ocultar botón de reanudar
+          iniciarPrograma();
         }
         else if (comandoBuffer.indexOf("parar") >= 0)
         {
           if (banderas.enProgreso || banderas.primeraPausaActiva)
           {
-            detenerPrograma();
+            enviarComandoNextion("page 2");
             enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
-            enviarComandoNextion("b3.tsw = 1");           // Mostrar botón de volver a lavar
+            detenerPrograma();
+            // enviarComandoNextion("b3.tsw = 1");           // Mostrar botón de volver a lavar
           }
         }
         else if (comandoBuffer.indexOf("emergencia") >= 0)
         {
           if (banderas.enProgreso || banderas.primeraPausaActiva)
           {
+            enviarComandoNextion("page 2");
+            enviarComandoNextion("b3.tsw = 1"); // Mostrar botón de volver   a lavar
+            enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
             activarEmergencia("EMEGENCIA");
-            enviarComandoNextion("b3.tsw = 1"); // Mostrar botón de volver a lavar
           }
         }
         comandoBuffer = "";
@@ -592,6 +611,41 @@ void procesarDesfogueFinal()
   }
 
   if (tiempoActual - tiempos.inicioDesfogueFinal < (TIEMPO_BLOQUEO_FINAL * 1000))
+  {
+    pines.reset();
+    pines.desfogue = false;
+    pines.puertaBloqueada = true;
+    pines.aplicar();
+  }
+  else
+  {
+    tiempos.reset();
+    pines.reset();
+    pines.desfogue = false;
+    pines.aplicar();
+
+    estadoLavado = ESPERA;
+    subEstado = LAVADO;
+    banderas.reset();
+    programaSeleccionado = 0;
+
+    enviarComandoNextion("page 1");
+    enviarComandoNextion("b3.tsw = 1");
+  }
+}
+
+void procesarDetenimiento()
+{
+  unsigned long tiempoActual = millis();
+
+  // Si es la primera vez que entramos al desfogue final
+  if (tiempos.inicioDetenimiento == 0)
+  {
+    tiempos.inicioDetenimiento = tiempoActual;
+    controlTimeout.iniciarTimeout(); // Iniciar timeout para desfogue final
+  }
+
+  if (tiempoActual - tiempos.inicioDetenimiento < (TIEMPO_DETENIDO * 1000))
   {
     pines.reset();
     pines.desfogue = false;
@@ -700,8 +754,8 @@ void detenerPrograma()
     banderas.primeraPausaActiva = false;
     errorTimeout = false;
 
-    estadoLavado = DESFOGUE_FINAL;
-    tiempos.inicioDesfogueFinal = millis();
+    estadoLavado = DETENIMIENTO;
+    tiempos.inicioDetenimiento = millis();
     controlTimeout.iniciarTimeout(); // Iniciar timeout para desfogue final
 
     enviarComandoNextion("page 3");
@@ -847,7 +901,7 @@ void loop()
 
   if (currentBtnState == LOW && lastBtnState == HIGH && (banderas.enProgreso || banderas.primeraPausaActiva)) // Botón presionado
   {
-    activarEmergencia("EMEGENCIA");
+    activarEmergencia("EMERGENCIA");
   }
   lastBtnState = currentBtnState;
 
@@ -882,5 +936,10 @@ void loop()
   if (estadoLavado == DESFOGUE_FINAL)
   {
     procesarDesfogueFinal();
+  }
+
+  if (estadoLavado == DETENIDO)
+  {
+    procesarDetenimiento();
   }
 }
