@@ -554,6 +554,7 @@ void iniciarPrograma()
     // Si estamos reanudando desde pausa, solo restauramos las banderas
     banderas.primeraPausaActiva = false;
     banderas.enProgreso = true;
+    actualizarEstadoEnPantalla("Reanudado");
 
     // Restaurar estados de los pines según el estado actual
     switch (estadoLavado)
@@ -564,7 +565,7 @@ void iniciarPrograma()
       if (subEstado == LAVADO)
       {
         pines.desfogue = true;                // Cerrar desfogue
-        // pines.ingresoAgua = !leerNivelAgua(); // Solo abrir si falta agua
+        pines.ingresoAgua = !leerNivelAgua(); // Solo abrir si falta agua
       }
       break;
     case CENTRIFUGADO:
@@ -725,26 +726,6 @@ String formatearTiempo(uint16_t segundos)
   uint8_t segs = segundos % 60;
   // Asegurar formato MM:SS con ceros a la izquierda
   return (minutos < 10 ? "0" : "") + String(minutos) + ":" + (segs < 10 ? "0" : "") + String(segs);
-}
-
-bool verificarSeguridadPuerta()
-{
-  // La puerta solo debe desbloquearse cuando:
-  // 1. El programa no está en progreso
-  // 2. No hay agua en la lavadora
-  // 3. No hay movimiento de motor
-
-  if (banderas.enProgreso ||
-      leerNivelAgua() ||
-      digitalRead(GIRAR_DERECHA_PIN) == HIGH ||
-      digitalRead(GIRAR_IZQUIERDA_PIN) == HIGH ||
-      digitalRead(CENTRIFUGAR_PIN) == HIGH)
-  {
-
-    digitalWrite(BLOQUEAR_PUERTA_PIN, HIGH);
-    return false;
-  }
-  return true;
 }
 
 void setup()
