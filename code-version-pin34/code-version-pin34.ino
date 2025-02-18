@@ -1,7 +1,3 @@
-// #include <HardwareSerial.h>
-
-// HardwareSerial Serial(2);
-
 // Configuración de pines
 // #define RX_PIN 16
 // #define TX_PIN 17
@@ -25,30 +21,31 @@ const uint16_t VALOR_MAX_ADC = 4095;   // Valor máximo del ADC (2^12 - 1)
 const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 
 // Tiempos en segundos para control de motor
-// const uint8_t TIEMPO_GIRO_DERECHA = 180;  // 180 segundos
-// const uint8_t TIEMPO_GIRO_IZQUIERDA = 180;
-// const uint8_t TIEMPO_PAUSA_GIRO = 60;
-const uint8_t TIEMPO_GIRO_DERECHA = 5;
-const uint8_t TIEMPO_GIRO_IZQUIERDA = 5;
-const uint8_t TIEMPO_PAUSA_GIRO = 3;
+const uint8_t TIEMPO_GIRO_DERECHA = 90;  // 180 segundos
+const uint8_t TIEMPO_GIRO_IZQUIERDA = 90;
+const uint8_t TIEMPO_PAUSA_GIRO = 60;
+// const uint8_t TIEMPO_GIRO_DERECHA = 5;
+// const uint8_t TIEMPO_GIRO_IZQUIERDA = 5;
+// const uint8_t TIEMPO_PAUSA_GIRO = 3;
 const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA + TIEMPO_PAUSA_GIRO;
 
 // Tiempos fijos para procesos específicos
-// const uint8_t TIEMPO_DESFOGUE = 120;
-// const uint16_t TIEMPO_CENTRIFUGADO = 420;  // 7*60
-// const uint8_t TIEMPO_BLOQUEO_FINAL = 120;  // 2*60
-const uint8_t TIEMPO_DESFOGUE = 5;
-const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
-const uint8_t TIEMPO_BLOQUEO_FINAL = 5; // 2*60
+const uint8_t TIEMPO_DESFOGUE = 120;
+const uint16_t TIEMPO_CENTRIFUGADO = 420;  // 7*60
+const uint8_t TIEMPO_BLOQUEO_FINAL = 60;  // 2*60
+const uint8_t TIEMPO_DETENIDO = 5; // 5 segundos
+// const uint8_t TIEMPO_DESFOGUE = 5;
+// const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
+// const uint8_t TIEMPO_BLOQUEO_FINAL = 5; // 2*60
 
 // Tiempos de cada tanda en segundos (ya incluyen su tiempo de desfogue)
 const uint16_t tiemposTanda[3][3] = {
-    // {1690, 1510, 910}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
-    // {1210, 910, 310},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
-    // { 910, 610, 310 }     // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
-    {120, 90, 60}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
-    {90, 60, 45},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
-    {60, 45, 30}   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+    {1690, 1510, 910}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
+    {1210, 910, 310},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
+    { 910, 610, 310 }     // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+    // {120, 90, 60}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
+    // {90, 60, 45},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
+    // {60, 45, 30}   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
 };
 
 struct TiemposLavado
@@ -58,6 +55,7 @@ struct TiemposLavado
   unsigned long inicioDesfogue;
   unsigned long inicioCentrifugado;
   unsigned long inicioDesfogueFinal;
+  unsigned long inicioDetenimiento;
   unsigned long ultimaActualizacion;
   unsigned long ultimaActualizacionSerial;
   unsigned long tiempoRestante;
@@ -70,6 +68,7 @@ struct TiemposLavado
     inicioDesfogue = 0;
     inicioCentrifugado = 0;
     inicioDesfogueFinal = 0;
+    inicioDetenimiento = 0;
     ultimaActualizacion = millis();
     ultimaActualizacionSerial = millis();
     tiempoRestante = 0;
@@ -121,12 +120,6 @@ struct BanderasProceso
   }
 };
 
-// Constantes de timeout y seguridad
-// const unsigned long TIMEOUT_LLENADO = 300000;           // 5 minutos
-// const unsigned long TIMEOUT_DESFOGUE = 180000;          // 3 minutos
-// const unsigned long TIMEOUT_MOTOR = 600000;             // 10 minutos
-// const unsigned long MAX_TIEMPO_DESFOGUE_FINAL = 300000; // 5 minutos máximo
-
 // Variables globales a agregar
 TiemposLavado tiempos;
 EstadoPines pines;
@@ -135,9 +128,6 @@ bool errorTimeout = false;
 
 // Variables de estado y control
 uint8_t programaSeleccionado = 0;
-// bool banderas.enProgreso = false;
-// bool emergencia = false;
-// bool primeraPausaActiva = false;
 
 String comandoBuffer = "";
 String estadoActual = "";
@@ -151,7 +141,8 @@ enum EstadoLavado
   TANDA2,
   TANDA3,
   CENTRIFUGADO,
-  DESFOGUE_FINAL
+  DESFOGUE_FINAL,
+  DETENIMIENTO
 };
 EstadoLavado estadoLavado = ESPERA;
 
@@ -169,33 +160,12 @@ void iniciarDesfogueFinal();
 void procesarTanda(int numeroTanda);
 void procesarCentrifugado();
 void procesarDesfogueFinal();
+void procesarDetenimiento();
 void actualizarTiempo();
 void configurarPaginaLavado();
 void activarEmergencia();
 void detenerPrograma();
 void iniciarPrograma();
-
-// bool verificarTimeouts(unsigned long tiempoActual) {
-//   switch (estadoLavado) {
-//     case TANDA1:
-//     case TANDA2:
-//     case TANDA3:
-//       if (subEstadoTanda == LLENADO && (tiempoActual - tiempos.inicioSubEstado > TIMEOUT_LLENADO)) {
-//         return true;
-//       }
-//       if (subEstadoTanda == DESFOGUE && (tiempoActual - tiempos.inicioDesfogue > TIMEOUT_DESFOGUE)) {
-//         return true;
-//       }
-//       break;
-
-//     case CENTRIFUGADO:
-//       if (tiempoActual - tiempos.inicioCentrifugado > TIMEOUT_MOTOR) {
-//         return true;
-//       }
-//       break;
-//   }
-//   return false;
-// }
 
 // Función para enviar comandos al Nextion
 void enviarComandoNextion(String comando)
@@ -474,22 +444,27 @@ void procesarComandosNextion()
         }
         else if (comandoBuffer.indexOf("comenzar") >= 0)
         {
-          iniciarPrograma();
-          enviarComandoNextion("b3.tsw = 0"); // Ocultar botón de volver a lavar
+          enviarComandoNextion("page 2");
+          enviarComandoNextion("b3.tsw = 0");           // Ocultar botón de volver a lavar
           enviarComandoNextion("btn_comenzar.tsw = 0"); // Ocultar botón de reanudar
+          iniciarPrograma();
         }
         else if (comandoBuffer.indexOf("parar") >= 0)
         {
           if (banderas.enProgreso || banderas.primeraPausaActiva)
           {
-            detenerPrograma();
+            enviarComandoNextion("page 2");
             enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
+            detenerPrograma();
           }
         }
         else if (comandoBuffer.indexOf("emergencia") >= 0)
         {
           if (banderas.enProgreso || banderas.primeraPausaActiva)
           {
+            enviarComandoNextion("page 2");
+            enviarComandoNextion("b3.tsw = 1"); // Mostrar botón de volver   a lavar
+            enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
             activarEmergencia();
           }
         }
@@ -502,6 +477,12 @@ void procesarComandosNextion()
 void procesarDesfogueFinal()
 {
   unsigned long tiempoActual = millis();
+
+  // Si es la primera vez que entramos al desfogue final
+  if (tiempos.inicioDesfogueFinal == 0)
+  {
+    tiempos.inicioDesfogueFinal = tiempoActual;
+  }
 
   // Fase de desfogue activo
   if (tiempoActual - tiempos.inicioDesfogueFinal < (TIEMPO_BLOQUEO_FINAL * 1000))
@@ -517,7 +498,7 @@ void procesarDesfogueFinal()
   {
     tiempos.reset(); // Reiniciar todos los tiempos
     pines.reset();
-    pines.desfogue = true; // Abrir desfogue
+    pines.desfogue = false; // Abrir desfogue
     pines.aplicar();
 
     estadoLavado = ESPERA;
@@ -528,6 +509,39 @@ void procesarDesfogueFinal()
 
     enviarComandoNextion("page 1");
     enviarComandoNextion("b3.tsw = 1"); // Mostrar botón de volver a lavar
+  }
+}
+
+void procesarDetenimiento()
+{
+  unsigned long tiempoActual = millis();
+
+  // Si es la primera vez que entramos al detenimiento
+  {
+    tiempos.inicioDetenimiento = tiempoActual;
+  }
+
+  if (tiempoActual - tiempos.inicioDetenimiento < (TIEMPO_DETENIDO * 1000))
+  {
+    pines.reset();
+    pines.desfogue = false;
+    pines.puertaBloqueada = true;
+    pines.aplicar();
+  }
+  else
+  {
+    tiempos.reset();
+    pines.reset();
+    pines.desfogue = false;
+    pines.aplicar();
+
+    estadoLavado = ESPERA;
+    subEstado = LAVADO;
+    banderas.reset();
+    programaSeleccionado = 0;
+
+    enviarComandoNextion("page 1");
+    enviarComandoNextion("b3.tsw = 1");
   }
 }
 
@@ -605,8 +619,6 @@ void detenerPrograma()
   else
   {
     // Segunda vez que se presiona parar
-    // uint8_t programaAnterior = programaSeleccionado;
-    // tiempos.reset();
     pines.reset();
     pines.desfogue = false;
     pines.puertaBloqueada = true;
@@ -618,7 +630,7 @@ void detenerPrograma()
     errorTimeout = false;
 
     // Iniciar proceso de desfogue final
-    estadoLavado = DESFOGUE_FINAL;
+    estadoLavado = DETENIMIENTO;
     tiempos.inicioDesfogueFinal = millis();
 
     // Restaurar el programa seleccionado
@@ -754,6 +766,7 @@ void setup()
   tiempos.ultimaActualizacionSerial = millis();
   // Agregar después del código actual de setup
   pines.reset();
+  pines.desfogue = false; // Por seguridad, desfogue abierto por defecto
   pines.aplicar();
   banderas.reset();
   tiempos.reset();
@@ -770,11 +783,6 @@ void loop()
     activarEmergencia();
   }
   lastBtnState = currentBtnState;
-
-  // if (!verificarSeguridadPuerta())
-  // {
-  //   digitalWrite(BLOQUEAR_PUERTA_PIN, HIGH);
-  // }
 
   procesarComandosNextion();
 
@@ -802,5 +810,10 @@ void loop()
   if (estadoLavado == DESFOGUE_FINAL)
   {
     procesarDesfogueFinal();
+  }
+
+  if (estadoLavado == DETENIMIENTO)
+  {
+    procesarDetenimiento();
   }
 }
