@@ -446,12 +446,14 @@ void procesarComandosNextion()
         }
         else if (comandoBuffer.indexOf("comenzar") >= 0)
         {
-          // enviarComandoNextion("page 2");
-          enviarComandoNextion("b_emergencia.tsw=1"); // emergencia
-          enviarComandoNextion("b_parar.tsw=1");      // parar
-          enviarComandoNextion("b_comenzar.tsw=0");   // comenzar
-          enviarComandoNextion("bretroceder.tsw=0");  // retroceder
-          iniciarPrograma();
+          if(!banderas.enProgreso){
+            enviarComandoNextion("page 2");
+            enviarComandoNextion("b_emergencia.tsw=1"); // emergencia
+            enviarComandoNextion("b_parar.tsw=1");      // parar
+            enviarComandoNextion("b_comenzar.tsw=0");   // comenzar
+            enviarComandoNextion("bretroceder.tsw=0");  // retroceder
+            iniciarPrograma();
+          }
         }
         else if (comandoBuffer.indexOf("parar") >= 0)
         {
@@ -599,16 +601,15 @@ void iniciarPrograma()
     pines.aplicar();
 
     tiempos.tiempoRestante = calcularTiempoTotal();
-    actualizarEstadoEnPantalla("Lavado 1");
+    // actualizarEstadoEnPantalla("Lavado 1");
     // enviarComandoNextion("btn_comenzar.tsw = 0");
   }
 }
 
 void detenerPrograma()
 {
-  if (!banderas.primeraPausaActiva) // Solo si está en progreso
+  if (!banderas.primeraPausaActiva) // Pausar por primera vez
   {
-    // Primera vez que se presiona parar
     banderas.primeraPausaActiva = true;
     banderas.enProgreso = false;
     banderas.emergencia = false;
@@ -622,7 +623,6 @@ void detenerPrograma()
   }
   else // Segunda vez que se presiona parar
   {
-    // Segunda vez que se presiona parar
     pines.reset();
     pines.desfogue = false;
     pines.puertaBloqueada = true;
