@@ -445,7 +445,7 @@ void procesarComandosNextion()
         else if (comandoBuffer.indexOf("comenzar") >= 0)
         {
           enviarComandoNextion("page 2");
-          enviarComandoNextion("b3.tsw = 0");           // Ocultar botón de volver a lavar
+          enviarComandoNextion("b3.vis = 0");           // Ocultar botón de volver a lavar
           enviarComandoNextion("btn_comenzar.tsw = 0"); // Ocultar botón de reanudar
           iniciarPrograma();
         }
@@ -463,7 +463,7 @@ void procesarComandosNextion()
           if (banderas.enProgreso || banderas.primeraPausaActiva)
           {
             enviarComandoNextion("page 2");
-            enviarComandoNextion("b3.tsw = 1"); // Mostrar botón de volver   a lavar
+            enviarComandoNextion("b3.vis = 1"); // Mostrar botón de volver   a lavar
             enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
             activarEmergencia();
           }
@@ -517,6 +517,7 @@ void procesarDetenimiento()
   unsigned long tiempoActual = millis();
 
   // Si es la primera vez que entramos al detenimiento
+  if (tiempos.inicioDetenimiento == 0)
   {
     tiempos.inicioDetenimiento = tiempoActual;
   }
