@@ -457,20 +457,10 @@ void procesarComandosNextion()
         }
         else if (comandoBuffer.indexOf("parar") >= 0)
         {
-          // if (banderas.enProgreso || banderas.primeraPausaActiva) // Cuando se presiona por segunda vez
-          // {
-          // enviarComandoNextion("b_emergencia.tsw=1"); // emergencia
-          // enviarComandoNextion("b_parar.tsw=1");      // parar
-          // enviarComandoNextion("b_comenzar.tsw=1");   // comenzar
-          // enviarComandoNextion("bretroceder.tsw=0");  // retroceder
           detenerPrograma();
-          // }
         }
         else if (comandoBuffer.indexOf("emergencia") >= 0)
         {
-          // enviarComandoNextion("page 2");
-          // enviarComandoNextion("bretroceder.tsw = 1"); // Mostrar botón de volver a lavar
-          // enviarComandoNextion("b_comenzar.tsw = 1");  // Mostrar botón de reanudar
           activarEmergencia();
         }
         else if (comandoBuffer.indexOf("regresar") >= 0)
@@ -604,10 +594,11 @@ void iniciarPrograma()
     pines.puertaBloqueada = true;
     pines.desfogue = true;    // Cerrar desfogue
     pines.ingresoAgua = true; // Iniciar llenado
+    pines.giroDerecha = true; // Iniciar giro
     pines.aplicar();
 
     tiempos.tiempoRestante = calcularTiempoTotal();
-    // actualizarEstadoEnPantalla("Lavado 1");
+    actualizarEstadoEnPantalla("Lavado 1 - derecha");
     // enviarComandoNextion("btn_comenzar.tsw = 0");
   }
 }
