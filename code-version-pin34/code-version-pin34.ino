@@ -21,7 +21,7 @@ const uint16_t VALOR_MAX_ADC = 4095;   // Valor máximo del ADC (2^12 - 1)
 const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 
 // Tiempos en segundos para control de motor
-const uint8_t TIEMPO_GIRO_DERECHA = 90;  // 180 segundos
+const uint8_t TIEMPO_GIRO_DERECHA = 90; // 180 segundos
 const uint8_t TIEMPO_GIRO_IZQUIERDA = 90;
 const uint8_t TIEMPO_PAUSA_GIRO = 60;
 // const uint8_t TIEMPO_GIRO_DERECHA = 5;
@@ -31,21 +31,21 @@ const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO +
 
 // Tiempos fijos para procesos específicos
 const uint8_t TIEMPO_DESFOGUE = 120;
-const uint16_t TIEMPO_CENTRIFUGADO = 420;  // 7*60
-const uint8_t TIEMPO_BLOQUEO_FINAL = 60;  // 2*60
-const uint8_t TIEMPO_DETENIDO = 5; // 5 segundos
+const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
+const uint8_t TIEMPO_EMERGENCIA = 60;     // 2*60
+const uint8_t TIEMPO_DETENIDO = 5;        // 5 segundos
 // const uint8_t TIEMPO_DESFOGUE = 5;
 // const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
-// const uint8_t TIEMPO_BLOQUEO_FINAL = 5; // 2*60
+// const uint8_t TIEMPO_EMERGENCIA = 5; // 2*60
 
 // Tiempos de cada tanda en segundos (ya incluyen su tiempo de desfogue)
 const uint16_t tiemposTanda[3][3] = {
     {1690, 1510, 910}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
     {1210, 910, 310},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
-    { 910, 610, 310 }     // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
-    // {120, 90, 60}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
-    // {90, 60, 45},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
-    // {60, 45, 30}   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+    {910, 610, 310}    // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
+                       // {120, 90, 60}, // Programa 1: 28*60+10, 25*60+10, 15*60+10 + 7*60 = 4530
+                       // {90, 60, 45},  // Programa 2: 20*60+10, 15*60+10, 5*60+10 + 7*60 =
+                       // {60, 45, 30}   // Programa 3: 15*60+10, 10*60+10, 5*60+10 + 7*60 = 2250
 };
 
 struct TiemposLavado
@@ -233,7 +233,7 @@ void procesarTanda(int numeroTanda)
     pines.aplicar();
   }
 
-  enviarComandoNextion("b3.tsw = 0"); // Ocultar botón de volver a lavar
+  // enviarComandoNextion("b3.tsw = 0"); // Ocultar botón de volver a lavar
 
   // Cálculo del tiempo transcurrido en el ciclo actual
   unsigned long tiempoTranscurridoEnCiclo = (tiempoActual - tiempos.inicioSubEstado) % (TIEMPO_CICLO_COMPLETO * 1000);
@@ -413,7 +413,7 @@ void procesarCentrifugado()
 
     // Actualización de la interfaz
     enviarComandoNextion("page 3");
-    enviarComandoNextion("t0.txt=\"DESFOGUE FINAL\"");
+    enviarComandoNextion("t_mensajefinal.txt=\"DESFOGUE FINAL\"");
   }
 
   // Aplicar todos los cambios de estado
@@ -441,32 +441,35 @@ void procesarComandosNextion()
           enviarComandoNextion("b_emergencia.tsw=0"); // emergencia
           enviarComandoNextion("b_parar.tsw=0");      // parar
           enviarComandoNextion("b_comenzar.tsw=1");   // comenzar
+          enviarComandoNextion("bretroceder.tsw=1");  // retroceder
+          enviarComandoNextion("t_programa.txt=\"" + String(programaSeleccionado) + "\"");
         }
         else if (comandoBuffer.indexOf("comenzar") >= 0)
         {
-          enviarComandoNextion("page 2");
-          enviarComandoNextion("b3.vis = 0");           // Ocultar botón de volver a lavar
-          enviarComandoNextion("btn_comenzar.tsw = 0"); // Ocultar botón de reanudar
+          // enviarComandoNextion("page 2");
+          enviarComandoNextion("b_emergencia.tsw=1"); // emergencia
+          enviarComandoNextion("b_parar.tsw=1");      // parar
+          enviarComandoNextion("b_comenzar.tsw=0");   // comenzar
+          enviarComandoNextion("bretroceder.tsw=0");  // retroceder
           iniciarPrograma();
         }
         else if (comandoBuffer.indexOf("parar") >= 0)
         {
-          if (banderas.enProgreso || banderas.primeraPausaActiva)
-          {
-            enviarComandoNextion("page 2");
-            enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
-            detenerPrograma();
-          }
+          // if (banderas.enProgreso || banderas.primeraPausaActiva) // Cuando se presiona por segunda vez
+          // {
+          // enviarComandoNextion("b_emergencia.tsw=1"); // emergencia
+          // enviarComandoNextion("b_parar.tsw=1");      // parar
+          // enviarComandoNextion("b_comenzar.tsw=1");   // comenzar
+          // enviarComandoNextion("bretroceder.tsw=0");  // retroceder
+          detenerPrograma();
+          // }
         }
         else if (comandoBuffer.indexOf("emergencia") >= 0)
         {
-          if (banderas.enProgreso || banderas.primeraPausaActiva)
-          {
-            enviarComandoNextion("page 2");
-            enviarComandoNextion("b3.vis = 1"); // Mostrar botón de volver   a lavar
-            enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
-            activarEmergencia();
-          }
+          // enviarComandoNextion("page 2");
+          // enviarComandoNextion("bretroceder.tsw = 1"); // Mostrar botón de volver a lavar
+          // enviarComandoNextion("b_comenzar.tsw = 1");  // Mostrar botón de reanudar
+          activarEmergencia();
         }
         comandoBuffer = "";
       }
@@ -485,7 +488,7 @@ void procesarDesfogueFinal()
   }
 
   // Fase de desfogue activo
-  if (tiempoActual - tiempos.inicioDesfogueFinal < (TIEMPO_BLOQUEO_FINAL * 1000))
+  if (tiempoActual - tiempos.inicioDesfogueFinal < (TIEMPO_EMERGENCIA * 1000))
   {
     // Mantener el estado de desfogue constantemente
     pines.reset();
@@ -508,7 +511,6 @@ void procesarDesfogueFinal()
     programaSeleccionado = 0;
 
     enviarComandoNextion("page 1");
-    enviarComandoNextion("b3.tsw = 1"); // Mostrar botón de volver a lavar
   }
 }
 
@@ -542,7 +544,7 @@ void procesarDetenimiento()
     programaSeleccionado = 0;
 
     enviarComandoNextion("page 1");
-    enviarComandoNextion("b3.tsw = 1");
+    // enviarComandoNextion("b3.tsw = 1");
   }
 }
 
@@ -604,7 +606,7 @@ void iniciarPrograma()
 
 void detenerPrograma()
 {
-  if (!banderas.primeraPausaActiva)
+  if (!banderas.primeraPausaActiva) // Solo si está en progreso
   {
     // Primera vez que se presiona parar
     banderas.primeraPausaActiva = true;
@@ -616,9 +618,9 @@ void detenerPrograma()
     pines.puertaBloqueada = true;
     pines.aplicar();
     actualizarEstadoEnPantalla("Pausado");
-    enviarComandoNextion("btn_comenzar.tsw = 1"); // Mostrar botón de reanudar
+    // enviarComandoNextion("b_comenzar.tsw = 1"); // Mostrar botón de reanudar
   }
-  else
+  else // Segunda vez que se presiona parar
   {
     // Segunda vez que se presiona parar
     pines.reset();
@@ -640,7 +642,8 @@ void detenerPrograma()
 
     // Cambiar a página de desfogue
     enviarComandoNextion("page 3");
-    enviarComandoNextion("t0.txt=\"DETENIDO\"");
+    enviarComandoNextion("t_mensajefinal.pco=8");
+    enviarComandoNextion("t_mensajefinal.txt=\"DETENIDO\"");
   }
 }
 
@@ -663,7 +666,8 @@ void activarEmergencia()
 
   // Asegurar que volvemos a la página correcta después de la banderas.emergencia
   enviarComandoNextion("page 3");
-  enviarComandoNextion("t0.txt=\"EMERGENCIA\"");
+  enviarComandoNextion("t_mensajefinal.pco=63488");
+  enviarComandoNextion("t_mensajefinal.txt=\"EMERGENCIA\"");
 }
 
 uint16_t calcularTiempoTotal()
