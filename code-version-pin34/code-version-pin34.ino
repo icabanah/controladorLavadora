@@ -447,7 +447,7 @@ void procesarComandosNextion()
         else if (comandoBuffer.indexOf("comenzar") >= 0)
         {
           if(!banderas.enProgreso){
-            enviarComandoNextion("page 2");
+            // enviarComandoNextion("page 2");
             enviarComandoNextion("b_emergencia.tsw=1"); // emergencia
             enviarComandoNextion("b_parar.tsw=1");      // parar
             enviarComandoNextion("b_comenzar.tsw=0");   // comenzar
@@ -472,6 +472,12 @@ void procesarComandosNextion()
           // enviarComandoNextion("bretroceder.tsw = 1"); // Mostrar botón de volver a lavar
           // enviarComandoNextion("b_comenzar.tsw = 1");  // Mostrar botón de reanudar
           activarEmergencia();
+        }
+        else if (comandoBuffer.indexOf("regresar") >= 0)
+        {
+          if(!banderas.enProgreso){
+            enviarComandoNextion("page 1");
+          }
         }
         comandoBuffer = "";
       }
