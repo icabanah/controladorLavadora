@@ -713,54 +713,49 @@ uint16_t calcularTiempoTotal()
   return total;
 }
 
-void actualizarTiempo()
-{
-  unsigned long ahora = millis();
+void actualizarTiempo() {
+    unsigned long ahora = millis();
 
-  // Protección contra desbordamiento mejorada
-  if (ahora < tiempos.ultimaActualizacion)
-  {
-    unsigned long diferencia = ULONG_MAX - tiempos.ultimaActualizacion + ahora;
-    if (diferencia >= 1000)
-    {
-      tiempos.tiempoRestante--;
-    }
-    tiempos.ultimaActualizacion = ahora;
-    tiempos.ultimaActualizacionSerial = ahora;
-    return;
-  }
-
-  // Verificación de estado completa
-  if (banderas.enProgreso && !banderas.emergencia && !banderas.primeraPausaActiva && !errorTimeout)
-  {
-    if ((ahora - tiempos.ultimaActualizacion) >= 1000)
-    {
-      if (tiempos.tiempoRestante > 0)
-      {
-        tiempos.tiempoRestante--;
-        char buffer[10];
-        snprintf(buffer, sizeof(buffer), "%02d:%02d",
-                 tiempos.tiempoRestante / 60, tiempos.tiempoRestante % 60);
-        enviarComandoNextion("tiempo.txt=\"" + String(buffer) + "\"");
-      }
-      tiempos.ultimaActualizacion = ahora;
-
-      // Logging cada 5 segundos
-      if ((ahora - tiempos.ultimaActualizacionSerial) >= INTERVALO_ACTUALIZACION_SERIAL)
-      {
+    // Protección contra desbordamiento mejorada
+    if (ahora < tiempos.ultimaActualizacion) {
+        unsigned long diferencia = ULONG_MAX - tiempos.ultimaActualizacion + ahora;
+        if (diferencia >= 1000) {
+            tiempos.tiempoRestante--;
+        }
+        tiempos.ultimaActualizacion = ahora;
         tiempos.ultimaActualizacionSerial = ahora;
-        // Implementar logging significativo aquí
-      }
+        return;
     }
-  }
+
+    // Verificación de estado completa
+    if (banderas.enProgreso && !banderas.emergencia && !banderas.primeraPausaActiva && !errorTimeout) {
+        if ((ahora - tiempos.ultimaActualizacion) >= 1000) {
+            if (tiempos.tiempoRestante > 0) {
+                tiempos.tiempoRestante--;
+                // Usar directamente la función formatearTiempo
+                String tiempoFormateado = formatearTiempo(tiempos.tiempoRestante);
+                enviarComandoNextion("tiempo.txt=\"" + tiempoFormateado + "\"");
+            }
+            tiempos.ultimaActualizacion = ahora;
+
+            // Logging cada 5 segundos
+            if ((ahora - tiempos.ultimaActualizacionSerial) >= INTERVALO_ACTUALIZACION_SERIAL) {
+                tiempos.ultimaActualizacionSerial = ahora;
+                // Implementar logging significativo aquí si es necesario
+            }
+        }
+    }
 }
 
-String formatearTiempo(uint16_t segundos)
-{
-  uint16_t minutos = segundos / 60;
-  uint8_t segs = segundos % 60;
-  // Asegurar formato MM:SS con ceros a la izquierda
-  return (minutos < 10 ? "0" : "") + String(minutos) + ":" + (segs < 10 ? "0" : "") + String(segs);
+String formatearTiempo(uint16_t segundos) {
+    uint16_t horas = segundos / 3600;
+    uint16_t minutos = (segundos % 3600) / 60;
+    uint8_t segs = segundos % 60;
+    
+    // Asegurar formato HH:MM:SS con ceros a la izquierda
+    return (horas < 10 ? "0" : "") + String(horas) + ":" +
+           (minutos < 10 ? "0" : "") + String(minutos) + ":" +
+           (segs < 10 ? "0" : "") + String(segs);
 }
 
 void setup()
