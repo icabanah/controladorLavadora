@@ -23,17 +23,18 @@ const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 // Tiempos en segundos para control de motor
 const uint8_t TIEMPO_GIRO_DERECHA = 90; // 180 segundos
 const uint8_t TIEMPO_GIRO_IZQUIERDA = 90;
-const uint8_t TIEMPO_PAUSA_GIRO = 60;
+const uint8_t TIEMPO_PAUSA_GIRO = 30;
 // const uint8_t TIEMPO_GIRO_DERECHA = 5;
 // const uint8_t TIEMPO_GIRO_IZQUIERDA = 5;
 // const uint8_t TIEMPO_PAUSA_GIRO = 3;
 const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA + TIEMPO_PAUSA_GIRO;
 
 // Tiempos fijos para procesos específicos
-const uint8_t TIEMPO_DESFOGUE = 120;
+const uint8_t TIEMPO_DESFOGUE = 90;
 const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
-const uint8_t TIEMPO_EMERGENCIA = 60;     // 2*60
+const uint8_t TIEMPO_DESFOGUE_FINAL = 5;     // 2*60
 const uint8_t TIEMPO_DETENIDO = 5;        // 5 segundos
+const uint8_t TIEMPO_EMERGENCIA = 5;     // 2*60
 // const uint8_t TIEMPO_DESFOGUE = 5;
 // const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
 // const uint8_t TIEMPO_EMERGENCIA = 5; // 2*60
@@ -56,6 +57,7 @@ struct TiemposLavado
   unsigned long inicioCentrifugado;
   unsigned long inicioDesfogueFinal;
   unsigned long inicioDetenimiento;
+  unsigned long inicioEmergencia;
   unsigned long ultimaActualizacion;
   unsigned long ultimaActualizacionSerial;
   unsigned long tiempoRestante;
@@ -69,6 +71,7 @@ struct TiemposLavado
     inicioCentrifugado = 0;
     inicioDesfogueFinal = 0;
     inicioDetenimiento = 0;
+    inicioEmergencia = 0;
     ultimaActualizacion = millis();
     ultimaActualizacionSerial = millis();
     tiempoRestante = 0;
@@ -161,6 +164,7 @@ void procesarTanda(int numeroTanda);
 void procesarCentrifugado();
 void procesarDesfogueFinal();
 void procesarDetenimiento();
+void procesarEmergencia();
 void actualizarTiempo();
 void configurarPaginaLavado();
 void activarEmergencia();
@@ -413,7 +417,7 @@ void procesarCentrifugado()
 
     // Actualización de la interfaz
     enviarComandoNextion("page 3");
-    enviarComandoNextion("t_mensajefinal.txt=\"DESFOGUE FINAL\"");
+    enviarComandoNextion("t_mensajefinal.txt=\"APERTURA DE PUERTA\"");
   }
 
   // Aplicar todos los cambios de estado
@@ -486,7 +490,7 @@ void procesarDesfogueFinal()
   }
 
   // Fase de desfogue activo
-  if (tiempoActual - tiempos.inicioDesfogueFinal < (TIEMPO_EMERGENCIA * 1000))
+  if (tiempoActual - tiempos.inicioDesfogueFinal < (TIEMPO_DESFOGUE_FINAL * 1000))
   {
     // Mantener el estado de desfogue constantemente
     pines.reset();
@@ -542,7 +546,39 @@ void procesarDetenimiento()
     programaSeleccionado = 0;
 
     enviarComandoNextion("page 1");
-    // enviarComandoNextion("b3.tsw = 1");
+  }
+}
+
+void procesarEmergencia()
+{
+  unsigned long tiempoActual = millis();
+
+  // Si es la primera vez que entramos al detenimiento
+  if (tiempos.inicioEmergencia == 0)
+  {
+    tiempos.inicioEmergencia = tiempoActual;
+  }
+
+  if (tiempoActual - tiempos.inicioEmergencia < (TIEMPO_EMERGENCIA * 1000))
+  {
+    pines.reset();
+    pines.desfogue = false;
+    pines.puertaBloqueada = true;
+    pines.aplicar();
+  }
+  else
+  {
+    tiempos.reset();
+    pines.reset();
+    pines.desfogue = false;
+    pines.aplicar();
+
+    estadoLavado = ESPERA;
+    subEstado = LAVADO;
+    banderas.reset();
+    programaSeleccionado = 0;
+
+    enviarComandoNextion("page 1");
   }
 }
 
@@ -576,7 +612,6 @@ void iniciarPrograma()
     }
     pines.puertaBloqueada = true;
     pines.aplicar();
-    // enviarComandoNextion("btn_comenzar.tsw = 0"); // Deshabilitar pulsacción de botón en pantalla
   }
   else
   {
@@ -599,7 +634,6 @@ void iniciarPrograma()
 
     tiempos.tiempoRestante = calcularTiempoTotal();
     actualizarEstadoEnPantalla("Lavado 1 - derecha");
-    // enviarComandoNextion("btn_comenzar.tsw = 0");
   }
 }
 
@@ -616,7 +650,6 @@ void detenerPrograma()
     pines.puertaBloqueada = true;
     pines.aplicar();
     actualizarEstadoEnPantalla("Pausado");
-    // enviarComandoNextion("b_comenzar.tsw = 1"); // Mostrar botón de reanudar
   }
   else // Segunda vez que se presiona parar
   {
@@ -632,7 +665,7 @@ void detenerPrograma()
 
     // Iniciar proceso de desfogue final
     estadoLavado = DETENIMIENTO;
-    tiempos.inicioDesfogueFinal = millis();
+    tiempos.inicioDetenimiento = millis();
 
     // Restaurar el programa seleccionado
     // programaSeleccionado = programaAnterior;
@@ -640,7 +673,7 @@ void detenerPrograma()
     // Cambiar a página de desfogue
     enviarComandoNextion("page 3");
     enviarComandoNextion("t_mensajefinal.pco=8");
-    enviarComandoNextion("t_mensajefinal.txt=\"DETENIDO\"");
+    enviarComandoNextion("t_mensajefinal.txt=\"APERTURA DE PUERTA\"");
   }
 }
 
@@ -659,12 +692,12 @@ void activarEmergencia()
 
   estadoLavado = DESFOGUE_FINAL;
   subEstado = LAVADO;
-  tiempos.inicioDesfogueFinal = millis();
+  tiempos.inicioEmergencia = millis();
 
   // Asegurar que volvemos a la página correcta después de la banderas.emergencia
-  enviarComandoNextion("page 3");
-  enviarComandoNextion("t_mensajefinal.pco=63488");
-  enviarComandoNextion("t_mensajefinal.txt=\"EMERGENCIA\"");
+  enviarComandoNextion("page 4");
+  enviarComandoNextion("t_emergencia.pco=63488");
+  enviarComandoNextion("t_emergencia.txt=\"EMERGENCIA\"");
 }
 
 uint16_t calcularTiempoTotal()
