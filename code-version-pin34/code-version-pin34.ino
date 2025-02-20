@@ -145,7 +145,8 @@ enum EstadoLavado
   TANDA3,
   CENTRIFUGADO,
   DESFOGUE_FINAL,
-  DETENIMIENTO
+  DETENIMIENTO,
+  EMERGENCIA
 };
 EstadoLavado estadoLavado = ESPERA;
 
@@ -690,7 +691,7 @@ void activarEmergencia()
   banderas.primeraPausaActiva = false;
   // errorTimeout = false;
 
-  estadoLavado = DESFOGUE_FINAL;
+  estadoLavado = EMERGENCIA;
   subEstado = LAVADO;
   tiempos.inicioEmergencia = millis();
 
@@ -826,5 +827,10 @@ void loop()
   if (estadoLavado == DETENIMIENTO)
   {
     procesarDetenimiento();
+  }
+
+  if (estadoLavado == EMERGENCIA)
+  {
+    procesarEmergencia();
   }
 }
