@@ -32,6 +32,7 @@ const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO +
 // Tiempos fijos para procesos específicos
 const uint8_t TIEMPO_DESFOGUE = 90;
 const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
+const uint16_t TIEMPO_CENTRIFUGADO_REAL = TIEMPO_CENTRIFUGADO - 60; // 7*60
 const uint8_t TIEMPO_DESFOGUE_FINAL = 5;     // 2*60
 const uint8_t TIEMPO_DETENIDO = 5;        // 5 segundos
 const uint8_t TIEMPO_EMERGENCIA = 5;     // 2*60
@@ -216,17 +217,6 @@ void procesarTanda(int numeroTanda)
   bool nivelLimiteAgua = leerNivelAgua();
   static String estadoAnterior = "";
 
-  // // Debug logging
-  // static unsigned long ultimoLog = 0;
-  // if (tiempoActual - ultimoLog > 1000)
-  // { // Log cada segundo
-  //   Serial.println("Estado: " + String(estadoLavado) +
-  //                  " SubEstado: " + String(subEstado) +
-  //                  " Tiempo restante: " + String(tiempos.tiempoRestante) +
-  //                  " Nivel agua: " + String(nivelLimiteAgua));
-  //   ultimoLog = tiempoActual;
-  // }
-
   // Inicialización de tiempos si es la primera vez
   if (tiempos.inicioTanda == 0)
   {
@@ -237,8 +227,6 @@ void procesarTanda(int numeroTanda)
     pines.ingresoAgua = true; // Abierto
     pines.aplicar();
   }
-
-  // enviarComandoNextion("b3.tsw = 0"); // Ocultar botón de volver a lavar
 
   // Cálculo del tiempo transcurrido en el ciclo actual
   unsigned long tiempoTranscurridoEnCiclo = (tiempoActual - tiempos.inicioSubEstado) % (TIEMPO_CICLO_COMPLETO * 1000);
@@ -368,6 +356,7 @@ void procesarTanda(int numeroTanda)
 void procesarCentrifugado()
 {
   unsigned long tiempoActual = millis();
+  const unsigned long TIEMPO_ANTICIPADO_APAGADO = 60; // 1 minuto en segundos
 
   // Fase de inicio del centrifugado
   if (tiempos.inicioCentrifugado == 0)
@@ -391,12 +380,25 @@ void procesarCentrifugado()
   }
 
   // Control del proceso de centrifugado
-  if (tiempoActual - tiempos.inicioCentrifugado < (TIEMPO_CENTRIFUGADO * 1000))
+  unsigned long tiempoTranscurrido = tiempoActual - tiempos.inicioCentrifugado;
+  
+  if (tiempoTranscurrido < (TIEMPO_CENTRIFUGADO * 1000))
   {
     // Verificación continua de seguridad
     if (!banderas.emergencia && !banderas.primeraPausaActiva)
     {
-      pines.centrifugado = true;
+      // Desactivar el centrifugado un minuto antes de finalizar
+      if (tiempoTranscurrido < ((TIEMPO_CENTRIFUGADO - TIEMPO_ANTICIPADO_APAGADO) * 1000))
+      {
+        pines.centrifugado = true;
+      }
+      else
+      {
+        // Último minuto sin centrifugado pero manteniendo el tiempo total
+        pines.centrifugado = false;
+        actualizarEstadoEnPantalla("Centrifugado - Finalizando");
+      }
+      
       pines.desfogue = false; // Mantener desfogue abierto
       pines.puertaBloqueada = true;
     }
@@ -418,7 +420,7 @@ void procesarCentrifugado()
 
     // Actualización de la interfaz
     enviarComandoNextion("page 3");
-    enviarComandoNextion("t_mensajefinal.txt=\"APERTURA DE PUERTA\"");
+    enviarComandoNextion("t_mensajefinal.txt=\"DESFOGUE FINAL\"");
   }
 
   // Aplicar todos los cambios de estado
