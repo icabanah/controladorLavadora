@@ -1,0 +1,95 @@
+flowchart TD
+    A[Inicio] --> B[Setup: Inicializar pines, comunicación serial]
+    B --> C[Loop principal]
+    
+    %% Procesamiento principal
+    C --> D{¿Botón de emergencia presionado?}
+    D -- Sí --> E[Activar emergencia]
+    D -- No --> F[Procesar comandos Nextion]
+    
+    F --> G[Actualizar tiempo]
+    
+    G --> H{¿Programa en progreso?}
+    H -- Sí --> I{¿Estado de emergencia?}
+    H -- No --> P
+    
+    I -- No --> J{¿Cuál es el estado actual?}
+    I -- Sí --> K[Procesar emergencia]
+    
+    %% Estados del programa
+    J --> J1[ESPERA]
+    J --> J2[TANDA1, TANDA2, TANDA3]
+    J --> J3[CENTRIFUGADO]
+    J --> J4[DESFOGUE_FINAL]
+    J --> J5[DETENIMIENTO]
+    
+    J2 --> J2A[Procesar Tanda]
+    J3 --> J3A[Procesar Centrifugado]
+    J4 --> J4A[Procesar Desfogue Final]
+    J5 --> J5A[Procesar Detenimiento]
+    
+    %% Procesamiento de tandas
+    J2A --> TANDA{¿Subestado?}
+    TANDA -- LAVADO --> LAVADO[Controlar nivel agua, alternar giros]
+    TANDA -- DESFOGUE --> DESFOGUE[Abrir desfogue, detener motores]
+    
+    LAVADO --> LAVADO_CHECK{¿Tiempo de lavado completado?}
+    LAVADO_CHECK -- Sí --> LAVADO_TO_DESFOGUE[Cambiar a subestado DESFOGUE]
+    LAVADO_CHECK -- No --> P
+    
+    DESFOGUE --> DESFOGUE_CHECK{¿Tiempo de desfogue completado?}
+    DESFOGUE_CHECK -- Sí --> DESFOGUE_NEXT{¿Es última tanda?}
+    DESFOGUE_CHECK -- No --> P
+    
+    DESFOGUE_NEXT -- Sí --> PREPARE_CENTRIFUGADO[Preparar fase de centrifugado]
+    DESFOGUE_NEXT -- No --> PREPARE_NEXT_TANDA[Preparar siguiente tanda]
+    
+    %% Procesamiento de centrifugado
+    J3A --> CENTRI_INIT{¿Primera vez?}
+    CENTRI_INIT -- Sí --> CENTRI_WATER{¿Hay agua?}
+    CENTRI_INIT -- No --> CENTRI_TIME{¿Tiempo completado?}
+    
+    CENTRI_WATER -- Sí --> CENTRI_DRAIN[Mantener desfogue abierto]
+    CENTRI_WATER -- No --> CENTRI_START[Iniciar centrifugado]
+    
+    CENTRI_TIME -- Sí --> CENTRI_END[Finalizar centrifugado]
+    CENTRI_TIME -- No --> CENTRI_CHECK{¿Último minuto?}
+    
+    CENTRI_CHECK -- Sí --> CENTRI_SLOW[Desactivar centrifugado, mantener tiempo]
+    CENTRI_CHECK -- No --> CENTRI_CONTINUE[Continuar centrifugado]
+    
+    CENTRI_END --> PREPARE_DESFOGUE[Iniciar desfogue final]
+    
+    %% Finalización
+    J4A --> FINAL_DESFOGUE{¿Tiempo completado?}
+    FINAL_DESFOGUE -- Sí --> RESET_ALL[Reiniciar todos los estados]
+    FINAL_DESFOGUE -- No --> P
+    
+    %% Estados de emergencia y detenimiento
+    K --> EME_TIME{¿Tiempo de emergencia completado?}
+    EME_TIME -- Sí --> RESET_ALL
+    EME_TIME -- No --> P
+    
+    J5A --> DET_TIME{¿Tiempo de detenimiento completado?}
+    DET_TIME -- Sí --> RESET_ALL
+    DET_TIME -- No --> P
+    
+    %% Retorno al loop
+    RESET_ALL --> P[Aplicar estados de pines]
+    P --> C
+    
+    %% Procesos de control de programas
+    subgraph "Procesos de control"
+        direction TB
+        CTRL1[Iniciar programa]
+        CTRL2[Detener programa]
+        CTRL3[Activar emergencia]
+    end
+    
+    %% Estructura de datos
+    subgraph "Estructuras de datos"
+        direction TB
+        DATA1[TiemposLavado: Control de temporizadores]
+        DATA2[EstadoPines: Estado de salidas]
+        DATA3[BanderasProceso: Estado del programa]
+    end

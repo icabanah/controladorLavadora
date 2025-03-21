@@ -14,14 +14,14 @@
 const float VOLTAJE_MAX_ENTRADA = 3.8; // Voltaje máximo de entrada (antes del divisor)
 const float VOLTAJE_MIN_ENTRADA = 0.5; // Voltaje mínimo de entrada
 const float VOLTAJE_MAX_ADC = 3.3;     // Voltaje máximo del ADC
-const float VOLTAJE_NIVEL = 3.0;       // Voltaje que indica nivel alcanzado (2.5V)
+const float VOLTAJE_NIVEL = 3.5;       // Voltaje que indica nivel alcanzado (2.5V)
 const uint8_t RESOLUCION_ADC = 12;     // Resolución del ADC
 const uint16_t VALOR_MAX_ADC = 4095;   // Valor máximo del ADC (2^12 - 1)
 // Factor de escala del divisor de voltaje
 const float FACTOR_DIVISOR = VOLTAJE_MAX_ADC / VOLTAJE_MAX_ENTRADA;
 
 // Tiempos en segundos para control de motor
-const uint8_t TIEMPO_GIRO_DERECHA = 90; // 180 segundos
+const uint8_t TIEMPO_GIRO_DERECHA = 90; // 90 segundos
 const uint8_t TIEMPO_GIRO_IZQUIERDA = 90;
 const uint8_t TIEMPO_PAUSA_GIRO = 30;
 // const uint8_t TIEMPO_GIRO_DERECHA = 5;
@@ -30,9 +30,9 @@ const uint8_t TIEMPO_PAUSA_GIRO = 30;
 const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO + TIEMPO_GIRO_IZQUIERDA + TIEMPO_PAUSA_GIRO;
 
 // Tiempos fijos para procesos específicos
-const uint8_t TIEMPO_DESFOGUE = 90;
+const uint8_t TIEMPO_DESFOGUE = 40;
 const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
-const uint16_t TIEMPO_CENTRIFUGADO_REAL = TIEMPO_CENTRIFUGADO - 60; // 7*60
+const uint16_t TIEMPO_CENTRIFUGADO_REAL = TIEMPO_CENTRIFUGADO - 30; // 7*60
 const uint8_t TIEMPO_DESFOGUE_FINAL = 5;     // 2*60
 const uint8_t TIEMPO_DETENIDO = 5;        // 5 segundos
 const uint8_t TIEMPO_EMERGENCIA = 5;     // 2*60
@@ -101,7 +101,7 @@ struct EstadoPines
 
   void aplicar()
   {
-    digitalWrite(BLOQUEAR_PUERTA_PIN, puertaBloqueada);
+    digitalWrite(BLOQUEAR_PUERTA_PIN, !puertaBloqueada);
     digitalWrite(GIRAR_DERECHA_PIN, giroDerecha);
     digitalWrite(GIRAR_IZQUIERDA_PIN, giroIzquierda);
     digitalWrite(CENTRIFUGAR_PIN, centrifugado);
@@ -396,7 +396,7 @@ void procesarCentrifugado()
       {
         // Último minuto sin centrifugado pero manteniendo el tiempo total
         pines.centrifugado = false;
-        actualizarEstadoEnPantalla("Centrifugado - Finalizando");
+        actualizarEstadoEnPantalla("Finalizando");
       }
       
       pines.desfogue = false; // Mantener desfogue abierto
