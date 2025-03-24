@@ -31,11 +31,11 @@ const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO +
 
 // Tiempos fijos para procesos específicos
 const uint8_t TIEMPO_DESFOGUE = 40;
-const uint16_t TIEMPO_CENTRIFUGADO = 420; // 7*60
+const uint16_t TIEMPO_CENTRIFUGADO = 420;                           // 7*60
 const uint16_t TIEMPO_CENTRIFUGADO_REAL = TIEMPO_CENTRIFUGADO - 30; // 7*60
-const uint8_t TIEMPO_DESFOGUE_FINAL = 5;     // 2*60
-const uint8_t TIEMPO_DETENIDO = 5;        // 5 segundos
-const uint8_t TIEMPO_EMERGENCIA = 5;     // 2*60
+const uint8_t TIEMPO_DESFOGUE_FINAL = 5;                            // 2*60
+const uint8_t TIEMPO_DETENIDO = 5;                                  // 5 segundos
+const uint8_t TIEMPO_EMERGENCIA = 5;                                // 2*60
 // const uint8_t TIEMPO_DESFOGUE = 5;
 // const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
 // const uint8_t TIEMPO_EMERGENCIA = 5; // 2*60
@@ -381,7 +381,7 @@ void procesarCentrifugado()
 
   // Control del proceso de centrifugado
   unsigned long tiempoTranscurrido = tiempoActual - tiempos.inicioCentrifugado;
-  
+
   if (tiempoTranscurrido < (TIEMPO_CENTRIFUGADO * 1000))
   {
     // Verificación continua de seguridad
@@ -398,7 +398,7 @@ void procesarCentrifugado()
         pines.centrifugado = false;
         actualizarEstadoEnPantalla("Finalizando");
       }
-      
+
       pines.desfogue = false; // Mantener desfogue abierto
       pines.puertaBloqueada = true;
     }
@@ -446,14 +446,15 @@ void procesarComandosNextion()
 
           enviarComandoNextion("page 2");
           enviarComandoNextion("b_emergencia.tsw=0"); // emergencia
-          enviarComandoNextion("b_parar.tsw=0");      // parar
-          enviarComandoNextion("b_comenzar.tsw=1");   // comenzar
-          enviarComandoNextion("bretroceder.tsw=1");  // retroceder
+          enviarComandoNextion("b_parar.tsw=0");     // parar
+          enviarComandoNextion("b_comenzar.tsw=1");  // comenzar
+          enviarComandoNextion("bretroceder.tsw=1"); // retroceder
           enviarComandoNextion("t_programa.txt=\"" + String(programaSeleccionado) + "\"");
         }
         else if (comandoBuffer.indexOf("comenzar") >= 0)
         {
-          if(!banderas.enProgreso){
+          if (!banderas.enProgreso)
+          {
             // enviarComandoNextion("page 2");
             enviarComandoNextion("b_emergencia.tsw=1"); // emergencia
             enviarComandoNextion("b_parar.tsw=1");      // parar
@@ -472,7 +473,8 @@ void procesarComandosNextion()
         }
         else if (comandoBuffer.indexOf("regresar") >= 0)
         {
-          if(!banderas.enProgreso){
+          if (!banderas.enProgreso)
+          {
             enviarComandoNextion("page 1");
           }
         }
@@ -545,7 +547,7 @@ void procesarDetenimiento()
 
     estadoLavado = ESPERA;
     subEstado = LAVADO;
-    banderas.reset();
+    banderas.reset(); // Esto debería reiniciar primeraPausaActiva
     programaSeleccionado = 0;
 
     enviarComandoNextion("page 1");
@@ -623,6 +625,7 @@ void iniciarPrograma()
     tiempos.inicioTanda = millis();
     tiempos.inicioSubEstado = millis();
 
+    banderas.reset();
     banderas.enProgreso = true;
     banderas.emergencia = false;
     estadoLavado = TANDA1;
@@ -670,9 +673,6 @@ void detenerPrograma()
     estadoLavado = DETENIMIENTO;
     tiempos.inicioDetenimiento = millis();
 
-    // Restaurar el programa seleccionado
-    // programaSeleccionado = programaAnterior;
-
     // Cambiar a página de desfogue
     enviarComandoNextion("page 3");
     enviarComandoNextion("t_mensajefinal.pco=8");
@@ -716,49 +716,57 @@ uint16_t calcularTiempoTotal()
   return total;
 }
 
-void actualizarTiempo() {
-    unsigned long ahora = millis();
+void actualizarTiempo()
+{
+  unsigned long ahora = millis();
 
-    // Protección contra desbordamiento mejorada
-    if (ahora < tiempos.ultimaActualizacion) {
-        unsigned long diferencia = ULONG_MAX - tiempos.ultimaActualizacion + ahora;
-        if (diferencia >= 1000) {
-            tiempos.tiempoRestante--;
-        }
-        tiempos.ultimaActualizacion = ahora;
+  // Protección contra desbordamiento mejorada
+  if (ahora < tiempos.ultimaActualizacion)
+  {
+    unsigned long diferencia = ULONG_MAX - tiempos.ultimaActualizacion + ahora;
+    if (diferencia >= 1000)
+    {
+      tiempos.tiempoRestante--;
+    }
+    tiempos.ultimaActualizacion = ahora;
+    tiempos.ultimaActualizacionSerial = ahora;
+    return;
+  }
+
+  // Verificación de estado completa
+  if (banderas.enProgreso && !banderas.emergencia && !banderas.primeraPausaActiva && !errorTimeout)
+  {
+    if ((ahora - tiempos.ultimaActualizacion) >= 1000)
+    {
+      if (tiempos.tiempoRestante > 0)
+      {
+        tiempos.tiempoRestante--;
+        // Usar directamente la función formatearTiempo
+        String tiempoFormateado = formatearTiempo(tiempos.tiempoRestante);
+        enviarComandoNextion("tiempo.txt=\"" + tiempoFormateado + "\"");
+      }
+      tiempos.ultimaActualizacion = ahora;
+
+      // Logging cada 5 segundos
+      if ((ahora - tiempos.ultimaActualizacionSerial) >= INTERVALO_ACTUALIZACION_SERIAL)
+      {
         tiempos.ultimaActualizacionSerial = ahora;
-        return;
+        // Implementar logging significativo aquí si es necesario
+      }
     }
-
-    // Verificación de estado completa
-    if (banderas.enProgreso && !banderas.emergencia && !banderas.primeraPausaActiva && !errorTimeout) {
-        if ((ahora - tiempos.ultimaActualizacion) >= 1000) {
-            if (tiempos.tiempoRestante > 0) {
-                tiempos.tiempoRestante--;
-                // Usar directamente la función formatearTiempo
-                String tiempoFormateado = formatearTiempo(tiempos.tiempoRestante);
-                enviarComandoNextion("tiempo.txt=\"" + tiempoFormateado + "\"");
-            }
-            tiempos.ultimaActualizacion = ahora;
-
-            // Logging cada 5 segundos
-            if ((ahora - tiempos.ultimaActualizacionSerial) >= INTERVALO_ACTUALIZACION_SERIAL) {
-                tiempos.ultimaActualizacionSerial = ahora;
-                // Implementar logging significativo aquí si es necesario
-            }
-        }
-    }
+  }
 }
 
-String formatearTiempo(uint16_t segundos) {
-    uint16_t horas = segundos / 3600;
-    uint16_t minutos = (segundos % 3600) / 60;
-    uint8_t segs = segundos % 60;
-    
-    // Asegurar formato HH:MM:SS con ceros a la izquierda
-    return (horas < 10 ? "0" : "") + String(horas) + ":" +
-           (minutos < 10 ? "0" : "") + String(minutos) + ":" +
-           (segs < 10 ? "0" : "") + String(segs);
+String formatearTiempo(uint16_t segundos)
+{
+  uint16_t horas = segundos / 3600;
+  uint16_t minutos = (segundos % 3600) / 60;
+  uint8_t segs = segundos % 60;
+
+  // Asegurar formato HH:MM:SS con ceros a la izquierda
+  return (horas < 10 ? "0" : "") + String(horas) + ":" +
+         (minutos < 10 ? "0" : "") + String(minutos) + ":" +
+         (segs < 10 ? "0" : "") + String(segs);
 }
 
 void setup()
@@ -792,7 +800,8 @@ void loop()
   static bool lastBtnState = HIGH; // Estado anterior del botón
   bool currentBtnState = digitalRead(BTN_EMERGENCIA_PIN);
 
-  if (currentBtnState == LOW && lastBtnState == HIGH && (banderas.enProgreso || banderas.primeraPausaActiva)) // Botón presionado
+  // Modificación recomendada
+  if (currentBtnState == LOW && lastBtnState == HIGH)
   {
     activarEmergencia();
   }
