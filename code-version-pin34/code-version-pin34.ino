@@ -31,11 +31,11 @@ const uint16_t TIEMPO_CICLO_COMPLETO = TIEMPO_GIRO_DERECHA + TIEMPO_PAUSA_GIRO +
 
 // Tiempos fijos para procesos específicos
 const uint8_t TIEMPO_DESFOGUE = 40;
-const uint16_t TIEMPO_CENTRIFUGADO = 420;                           // 7*60
-const uint16_t TIEMPO_CENTRIFUGADO_REAL = TIEMPO_CENTRIFUGADO - 30; // 7*60
-const uint8_t TIEMPO_DESFOGUE_FINAL = 5;                            // 2*60
-const uint8_t TIEMPO_DETENIDO = 5;                                  // 5 segundos
-const uint8_t TIEMPO_EMERGENCIA = 5;                                // 2*60
+const uint16_t TIEMPO_CENTRIFUGADO = 420;           // 7*60
+const uint8_t TIEMPO_PREPARACION_CENTRIFUGADO = 60; // 60 segundos (1 minuto)
+const uint8_t TIEMPO_DESFOGUE_FINAL = 5;            // 2*60
+const uint8_t TIEMPO_DETENIDO = 5;                  // 5 segundos
+const uint8_t TIEMPO_EMERGENCIA = 5;                // 2*60
 // const uint8_t TIEMPO_DESFOGUE = 5;
 // const uint16_t TIEMPO_CENTRIFUGADO = 5; // 7*60
 // const uint8_t TIEMPO_EMERGENCIA = 5; // 2*60
@@ -55,6 +55,7 @@ struct TiemposLavado
   unsigned long inicioSubEstado;
   unsigned long inicioTanda;
   unsigned long inicioDesfogue;
+  unsigned long inicioPreparacionCentrifugado;
   unsigned long inicioCentrifugado;
   unsigned long inicioDesfogueFinal;
   unsigned long inicioDetenimiento;
@@ -69,6 +70,7 @@ struct TiemposLavado
     inicioSubEstado = 0;
     inicioTanda = 0;
     inicioDesfogue = 0;
+    inicioPreparacionCentrifugado = 0;
     inicioCentrifugado = 0;
     inicioDesfogueFinal = 0;
     inicioDetenimiento = 0;
@@ -144,6 +146,7 @@ enum EstadoLavado
   TANDA1,
   TANDA2,
   TANDA3,
+  PREPARACION_CENTRIFUGADO,
   CENTRIFUGADO,
   DESFOGUE_FINAL,
   DETENIMIENTO,
@@ -327,12 +330,17 @@ void procesarTanda(int numeroTanda)
       else
       {
         // Preparar centrifugado
-        estadoLavado = CENTRIFUGADO;
-        tiempos.inicioTanda = 0;
+        // estadoLavado = CENTRIFUGADO;
+        // tiempos.inicioTanda = 0;5
+
+        // Preparar fase de preparación de centrifugado
+        estadoLavado = PREPARACION_CENTRIFUGADO;
+        tiempos.inicioPreparacionCentrifugado = tiempoActual;
 
         pines.reset();
         pines.desfogue = false; // Mantener desfogue abierto
-        pines.centrifugado = true;
+        // pines.centrifugado = true;
+        pines.giroDerecha = true;
         pines.puertaBloqueada = true;
         pines.aplicar();
 
@@ -351,6 +359,37 @@ void procesarTanda(int numeroTanda)
 
   // Aplicar cambios en los pines si hubo modificaciones
   pines.aplicar();
+}
+
+void procesarPreparacionCentrifugado()
+{
+  unsigned long tiempoActual = millis();
+
+  // Primera vez que entramos en este estado
+  if (tiempos.inicioPreparacionCentrifugado == 0)
+  {
+    tiempos.inicioPreparacionCentrifugado = tiempoActual;
+    pines.reset();
+    pines.desfogue = false;   // Mantener desfogue abierto
+    pines.giroDerecha = true; // Giro a la derecha
+    pines.puertaBloqueada = true;
+    pines.aplicar();
+    actualizarEstadoEnPantalla("Pre-centrifugado");
+  }
+
+  // Verificar si terminó el tiempo de preparación
+  if (tiempoActual - tiempos.inicioPreparacionCentrifugado >= (TIEMPO_PREPARACION_CENTRIFUGADO * 1000))
+  {
+    // Transición al estado de centrifugado
+    estadoLavado = CENTRIFUGADO;
+    tiempos.inicioCentrifugado = 0; // Se inicializará en procesarCentrifugado
+    tiempos.inicioPreparacionCentrifugado = 0;
+
+    pines.reset();
+    pines.desfogue = false; // Mantener desfogue abierto
+    pines.puertaBloqueada = true;
+    pines.aplicar();
+  }
 }
 
 void procesarCentrifugado()
@@ -446,9 +485,9 @@ void procesarComandosNextion()
 
           enviarComandoNextion("page 2");
           enviarComandoNextion("b_emergencia.tsw=0"); // emergencia
-          enviarComandoNextion("b_parar.tsw=0");     // parar
-          enviarComandoNextion("b_comenzar.tsw=1");  // comenzar
-          enviarComandoNextion("bretroceder.tsw=1"); // retroceder
+          enviarComandoNextion("b_parar.tsw=0");      // parar
+          enviarComandoNextion("b_comenzar.tsw=1");   // comenzar
+          enviarComandoNextion("bretroceder.tsw=1");  // retroceder
           enviarComandoNextion("t_programa.txt=\"" + String(programaSeleccionado) + "\"");
         }
         else if (comandoBuffer.indexOf("comenzar") >= 0)
@@ -703,16 +742,14 @@ void activarEmergencia()
   enviarComandoNextion("t_emergencia.txt=\"EMERGENCIA\"");
 }
 
-uint16_t calcularTiempoTotal()
-{
+uint16_t calcularTiempoTotal() {
   int total = 0;
   // Suma de tiempos de cada tanda (que ya incluyen sus desfogues)
-  for (int i = 0; i < 3; i++)
-  {
+  for (int i = 0; i < 3; i++) {
     total += tiemposTanda[programaSeleccionado - 1][i];
   }
-  // Agregar solo el tiempo de centrifugado
-  total += TIEMPO_CENTRIFUGADO;
+  // Agregar tiempo de preparación y centrifugado
+  total += TIEMPO_PREPARACION_CENTRIFUGADO + TIEMPO_CENTRIFUGADO;
   return total;
 }
 
@@ -823,6 +860,9 @@ void loop()
     case TANDA2:
     case TANDA3:
       procesarTanda(estadoLavado - TANDA1 + 1);
+      break;
+    case PREPARACION_CENTRIFUGADO:
+      procesarPreparacionCentrifugado();
       break;
     case CENTRIFUGADO:
       procesarCentrifugado();
