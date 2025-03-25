@@ -356,7 +356,7 @@ void procesarTanda(int numeroTanda)
 void procesarCentrifugado()
 {
   unsigned long tiempoActual = millis();
-  const unsigned long TIEMPO_ANTICIPADO_APAGADO = 60; // 1 minuto en segundos
+  const unsigned long TIEMPO_ANTICIPADO_APAGADO = 30; // 30 segundos
 
   // Fase de inicio del centrifugado
   if (tiempos.inicioCentrifugado == 0)
