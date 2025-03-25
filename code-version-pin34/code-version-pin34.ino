@@ -663,7 +663,7 @@ void iniciarPrograma()
     case PREPARACION_CENTRIFUGADO:
       pines.desfogue = false;
       pines.giroDerecha = true;
-      pines.giroIzquierda = false 
+      pines.giroIzquierda = false;
       break;
     case CENTRIFUGADO:
       pines.desfogue = false;
