@@ -369,25 +369,26 @@ void procesarPreparacionCentrifugado()
   if (tiempos.inicioPreparacionCentrifugado == 0)
   {
     tiempos.inicioPreparacionCentrifugado = tiempoActual;
-    pines.reset();
-    pines.desfogue = false;   // Mantener desfogue abierto
-    pines.giroDerecha = true; // Giro a la derecha
+    pines.desfogue = false;      // Mantener desfogue abierto
+    pines.giroDerecha = true;    // Giro a la derecha
+    pines.giroIzquierda = false; // Asegurar que solo gira a la derecha
     pines.puertaBloqueada = true;
     pines.aplicar();
-    actualizarEstadoEnPantalla("Pre-centrifugado");
+    actualizarEstadoEnPantalla("Preparando centrifugado");
   }
 
   // Verificar si terminó el tiempo de preparación
   if (tiempoActual - tiempos.inicioPreparacionCentrifugado >= (TIEMPO_PREPARACION_CENTRIFUGADO * 1000))
   {
-    // Transición al estado de centrifugado
+    // Transición al estado de centrifugado manteniendo el giro derecho
     estadoLavado = CENTRIFUGADO;
-    tiempos.inicioCentrifugado = 0; // Se inicializará en procesarCentrifugado
-    tiempos.inicioPreparacionCentrifugado = 0;
+    tiempos.inicioCentrifugado = tiempoActual; // Inicializar directamente
 
-    pines.reset();
+    // No resetear pines, solo activar el centrifugado manteniendo el giro derecho
+    pines.centrifugado = true;
     pines.desfogue = false; // Mantener desfogue abierto
     pines.puertaBloqueada = true;
+    // No modificar pines.giroDerecha para mantenerlo activado
     pines.aplicar();
   }
 }
@@ -406,6 +407,9 @@ void procesarCentrifugado()
       // Si aún hay agua, mantener desfogue abierto y esperar
       pines.desfogue = false;
       pines.centrifugado = false;
+      // Mantener el giro derecho activo
+      pines.giroDerecha = true;
+      pines.giroIzquierda = false;
       pines.puertaBloqueada = true;
       pines.aplicar();
       return;
@@ -414,7 +418,11 @@ void procesarCentrifugado()
     // Inicialización segura del centrifugado
     tiempos.inicioCentrifugado = tiempoActual;
     pines.desfogue = false;       // Mantener desfogue abierto durante centrifugado
+    pines.centrifugado = true;    // Activar centrifugado
+    pines.giroDerecha = true;     // Mantener giro derecho activado
+    pines.giroIzquierda = false;  // Asegurar que no hay giro izquierdo
     pines.puertaBloqueada = true; // Asegurar que la puerta esté bloqueada
+    pines.aplicar();
     actualizarEstadoEnPantalla("Centrifugado");
   }
 
@@ -426,15 +434,17 @@ void procesarCentrifugado()
     // Verificación continua de seguridad
     if (!banderas.emergencia && !banderas.primeraPausaActiva)
     {
-      // Desactivar el centrifugado un minuto antes de finalizar
+      // Desactivar el centrifugado un tiempo antes de finalizar
       if (tiempoTranscurrido < ((TIEMPO_CENTRIFUGADO - TIEMPO_ANTICIPADO_APAGADO) * 1000))
       {
         pines.centrifugado = true;
+        pines.giroDerecha = true; // Mantener giro derecho durante el centrifugado
       }
       else
       {
         // Último minuto sin centrifugado pero manteniendo el tiempo total
         pines.centrifugado = false;
+        pines.giroDerecha = false; // Desactivar giro derecho en fase final
         actualizarEstadoEnPantalla("Finalizando");
       }
 
@@ -444,26 +454,27 @@ void procesarCentrifugado()
     else
     {
       pines.centrifugado = false;
+      pines.giroDerecha = false; // Desactivar giro en caso de emergencia
     }
+    pines.aplicar();
   }
   else
   {
     // Finalización segura del centrifugado
     pines.centrifugado = false;
-    pines.desfogue = false; // Mantener desfogue abierto para fase final
+    pines.giroDerecha = false; // Desactivar giro derecho al finalizar
+    pines.desfogue = false;    // Mantener desfogue abierto para fase final
+    pines.aplicar();
 
     // Transición al siguiente estado
     estadoLavado = DESFOGUE_FINAL;
     tiempos.inicioDesfogueFinal = tiempoActual;
-    tiempos.inicioCentrifugado = 0;
+    // No resetear tiempos.inicioCentrifugado para mantener la referencia
 
     // Actualización de la interfaz
     enviarComandoNextion("page 3");
     enviarComandoNextion("t_mensajefinal.txt=\"DESFOGUE FINAL\"");
   }
-
-  // Aplicar todos los cambios de estado
-  pines.aplicar();
 }
 
 void procesarComandosNextion()
@@ -649,9 +660,15 @@ void iniciarPrograma()
         pines.ingresoAgua = !leerNivelAgua(); // Solo abrir si falta agua
       }
       break;
+    case PREPARACION_CENTRIFUGADO:
+      pines.desfogue = false;
+      pines.giroDerecha = true;
+      pines.giroIzquierda = false 
+      break;
     case CENTRIFUGADO:
       pines.desfogue = false;
       pines.centrifugado = true;
+      pines.giroDerecha = true;
       break;
     }
     pines.puertaBloqueada = true;
@@ -742,10 +759,12 @@ void activarEmergencia()
   enviarComandoNextion("t_emergencia.txt=\"EMERGENCIA\"");
 }
 
-uint16_t calcularTiempoTotal() {
+uint16_t calcularTiempoTotal()
+{
   int total = 0;
   // Suma de tiempos de cada tanda (que ya incluyen sus desfogues)
-  for (int i = 0; i < 3; i++) {
+  for (int i = 0; i < 3; i++)
+  {
     total += tiemposTanda[programaSeleccionado - 1][i];
   }
   // Agregar tiempo de preparación y centrifugado
