@@ -235,7 +235,7 @@ void procesarTanda(int numeroTanda)
   unsigned long tiempoTranscurridoEnCiclo = (tiempoActual - tiempos.inicioSubEstado) % (TIEMPO_CICLO_COMPLETO * 1000);
 
   // Verificación de fin de programa
-  if (tiempos.tiempoRestante <= 0)
+  if (numeroTanda == 3 && tiempos.tiempoRestante <= 0)
   {
     procesarDesfogueFinal();
     return;
@@ -331,7 +331,7 @@ void procesarTanda(int numeroTanda)
       {
         // Preparar centrifugado
         // estadoLavado = CENTRIFUGADO;
-        // tiempos.inicioTanda = 0;5
+        // tiempos.inicioTanda = 0;
 
         // Preparar fase de preparación de centrifugado
         estadoLavado = PREPARACION_CENTRIFUGADO;
@@ -398,6 +398,13 @@ void procesarCentrifugado()
   unsigned long tiempoActual = millis();
   const unsigned long TIEMPO_ANTICIPADO_APAGADO = 30; // 30 segundos
 
+  // unsigned long tiempoActual = millis();
+  static unsigned long ultimaVerificacionNivel = 0;
+  static unsigned int contadorIntentos = 0;
+  const unsigned long INTERVALO_VERIFICACION = 5000; // 5 segundos entre verificaciones
+  const unsigned int MAX_INTENTOS = 12; // 1 minuto máximo (12 * 5s)
+
+
   // Fase de inicio del centrifugado
   if (tiempos.inicioCentrifugado == 0)
   {
@@ -405,15 +412,31 @@ void procesarCentrifugado()
     if (leerNivelAgua())
     {
       // Si aún hay agua, mantener desfogue abierto y esperar
+      if (tiempoActual - ultimaVerificacionNivel >= INTERVALO_VERIFICACION) {
+        ultimaVerificacionNivel = tiempoActual;
+        contadorIntentos++;
+        
+        // Agregar log para verificación
+        actualizarEstadoEnPantalla("Esperando desfogue " + String(contadorIntentos));
+      }
+      
+      // Si esperamos demasiado tiempo, pasar a emergencia
+      if (contadorIntentos >= MAX_INTENTOS) {
+        activarEmergencia();
+        return;
+      }
+      
       pines.desfogue = false;
       pines.centrifugado = false;
-      // Mantener el giro derecho activo
       pines.giroDerecha = true;
       pines.giroIzquierda = false;
       pines.puertaBloqueada = true;
       pines.aplicar();
       return;
     }
+
+    // Restablecer el contador de intentos
+    contadorIntentos = 0;
 
     // Inicialización segura del centrifugado
     tiempos.inicioCentrifugado = tiempoActual;
@@ -767,8 +790,8 @@ uint16_t calcularTiempoTotal()
   {
     total += tiemposTanda[programaSeleccionado - 1][i];
   }
-  // Agregar tiempo de preparación y centrifugado
-  total += TIEMPO_PREPARACION_CENTRIFUGADO + TIEMPO_CENTRIFUGADO;
+  // Agregar tiempo de preparación, centrifugado y desfogue final
+  total += TIEMPO_PREPARACION_CENTRIFUGADO + TIEMPO_CENTRIFUGADO + TIEMPO_DESFOGUE_FINAL;
   return total;
 }
 
