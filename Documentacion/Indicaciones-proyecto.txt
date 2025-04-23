@@ -1,0 +1,34 @@
+Hay tres páginas en el nextion 0, 1 y 2 (Intro, Menu y pSeleccionado respectivamente). 
+
+Existen 3 programas que se muestran mediante botones en la pagina 1 (Menu). Cada programa difiere de otro en los valores de algunas variables. 
+
+Las variables de entrada son:
+* Un sensor de nivel que mide el nivel mediante un prensoestato que tiene una salida analógica de 0.5 VDC para 0 mBar y 3.5 VDC para 50 mBar. 
+
+Las variables de salida a controlar son:
+* TiempoTotal (el tiempo que apacerá en la página 2, pSeleccionado en el temporizador).
+* BloquearPuerta, que se pone en 1 apenas presione el boton "comenzar" en el nextion.
+* girarDerecha, girarIzquierda. Estas dos salidas son para controlar la dirección de giro de un motor de la lavadora. Activo nivel 1.
+* Centrifugar, que se pone en 1 para girar en un sentido (esta salida es independiente de las dos salidas anteriores).
+* IngresarAgua, se pone en 1 para vertir agua dentro de la lavadora.
+* Desfogar, se pone en 1 para desfogar el agua dentro de la lavadora.
+
+Las instrucciones de uso son las siguientes:
+* Al seleccionar el programa se prepara la ropa para colocar en la lavadora. Una vez ingresado la ropa se presiona "comenzar".
+* Bloquea la puerta, ingresa el agua (llenado1) y la lavadora comienza a mover a la derecha por 3 minutos, una pausa de 1 minuto, luego a la izquierda 3 minutos. (Llamaremos a ese proceso de derecha, pausa e izquierda como "giroMotor")
+* El llenado del agua se detiene cuando la entrada analógica de un valor por definir (para fines de prueba que sea 2.5 VDC). 
+* Este proceso de "giroMotor" se repite por 28 minutos y luego de un desfogue de agua (desfoque1) (voltaje 0.5 VDC) vuelve a entrar agua hasta el mismo límite de voltaje DC (llenado2) y mientras llena continua con los giros a derecha e izquierda como en el item anterior, esto por 25 minutos más y luego, vuelve a desfogar el agua (desfoque2).
+Entonces tendríamos las variables "llenado1", "desfogue1", "llenado2, "desfogue2". Este primer y segundo proceso lo llamaríamos "tanda1" y "tanda2" respectivamente.
+* Luego de eso, vuelve a ingresar agua hasta el límite de voltaje (2.5VDC), y el proceso de "giroMotor" sigue por un tipo de 15 minutos más. 
+Aquí tendríamos "llenado3" y "desfogue3". Se le llamaría "tanda3".
+* Una vez terminado los tiempo y enjuague procede al centrifugado por un tiempo de 7 minutos. Esto es, poner la salida de centrifugado en 1. 
+Aquí tendríamos "centrifugado".
+* Al terminar el tiempo total mantiene cerrada la puerta por 2 minutos, luego de ello se abre la puerta. 
+* Luego, esp32 debe enviar a nexion un comando para que retorne a la página 1 (Menu).
+* En caso de emergencia (al presionar el botón de emergencia). El temporizador se detiene, el proceso "giroMotor" también. Esta pausa se reanuda si se vuelve a presionar "comenzar" de nuevo. 
+* Si se presiona "parar" luego de presionar emergencia, entonces se procede con el desfogue del líquido de la lavadora y si va ingresando agua, se detiene. 
+* En el caso del programa 2, lo único que varía son los tiempos de las tandas 1, 2 y 3. La tanda 1 por 20 minutos. Tanda 2 por 15 minutos y tanda 3 por 5 minutos.
+* En el caso del programa 3, los tiempos de las tandas son: tanda1 = 15 minutos, tanda2 = 10 minutos y tanda3 = 5 minutos.
+
+desfogue 10 s
+tiempo total sin tiempo de giros ni pausas
