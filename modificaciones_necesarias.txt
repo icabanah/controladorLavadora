@@ -1,0 +1,67 @@
+MODIFICACIONES NECESARIAS PARA CORREGIR PROBLEMAS DE CENTRIFUGADO
+
+El problema ocurre cuando la lavadora está a 8 minutos para terminar y entrar a centrifugado (o al comenzar esta fase).
+Se ha identificado que hay tres modificaciones clave que resolver el problema:
+
+1. REDUCIR EL UMBRAL DE DETECCIÓN DE NIVEL DE AGUA:
+   - Cambiar el valor de VOLTAJE_NIVEL de 3.5V a 2.8V
+   - Línea original:
+     const float VOLTAJE_NIVEL = 3.5;       // Voltaje que indica nivel alcanzado (2.5V)
+   - Modificar a:
+     const float VOLTAJE_NIVEL = 2.8;       // MODIFICADO: Reducido para mayor tolerancia
+
+2. AGREGAR UNA FUNCIÓN DE LECTURA MÁS ESTABLE DEL NIVEL DE AGUA:
+   Agregar después de la función leerNivelAgua() el siguiente código:
+
+// Función modificada para muestreo más estable del nivel de agua
+// Esta función hace múltiples lecturas y devuelve un promedio para evitar falsas lecturas
+bool leerNivelAguaEstable()
+{
+  // Tomar varias muestras y promediar para mayor estabilidad
+  const int NUM_MUESTRAS = 5;
+  float sumaMuestras = 0;
+  
+  for (int i = 0; i < NUM_MUESTRAS; i++) {
+    int valorADC = analogRead(NIVEL_AGUA_PIN);
+    float voltajeLeido = (valorADC * VOLTAJE_MAX_ENTRADA) / VALOR_MAX_ADC;
+    sumaMuestras += voltajeLeido;
+    delay(10); // Pequeña pausa entre muestras
+  }
+  
+  float promedioVoltaje = sumaMuestras / NUM_MUESTRAS;
+  
+  // En el caso del centrifugado usamos un umbral más bajo para evitar falsos positivos
+  if (estadoLavado == CENTRIFUGADO || estadoLavado == PREPARACION_CENTRIFUGADO) {
+    return promedioVoltaje >= (VOLTAJE_NIVEL - 0.5); // Umbral más bajo durante centrifugado
+  }
+  
+  return promedioVoltaje >= VOLTAJE_NIVEL;
+}
+
+3. MODIFICAR LA FUNCIÓN DE PROCESAMIENTO DE CENTRIFUGADO:
+   Cambiar el código de la función procesarCentrifugado() para evitar que entre en estado de emergencia.
+   En particular, modificar la parte que detecta nivel de agua y activa la emergencia:
+
+   - En el código original, se activa emergencia después de varios intentos:
+     if (contadorIntentos >= MAX_INTENTOS) {
+       activarEmergencia();
+       return;
+     }
+
+   - Modificar para que, en lugar de activar emergencia, simplemente fuerce el inicio del centrifugado:
+     if (contadorIntentos >= MAX_INTENTOS) {
+       actualizarEstadoEnPantalla("Forzando centrifugado");
+       // Inicializar el centrifugado a pesar de la detección de agua
+       tiempos.inicioCentrifugado = tiempoActual;
+       contadorIntentos = 0;
+     }
+
+   - También cambiar para usar leerNivelAguaEstable() en lugar de leerNivelAgua():
+     if (leerNivelAguaEstable() && estadoLavado != EMERGENCIA)
+
+INSTRUCCIONES DE IMPLEMENTACIÓN:
+1. Hacer una copia de seguridad del archivo original
+2. Implementar estos cambios uno por uno
+3. Probar el funcionamiento verificando el comportamiento en la fase de centrifugado
+
+Estas modificaciones evitarán que la lavadora entre en modo emergencia innecesariamente debido a falsas lecturas del sensor de nivel de agua durante la fase de centrifugado.

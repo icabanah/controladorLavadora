@@ -1,0 +1,38 @@
+{
+    "configurations": [
+        {
+            "name": "Win32",
+            "includePath": [
+                "${workspaceFolder}/**"
+            ],
+            "defines": [
+                "_DEBUG",
+                "UNICODE",
+                "_UNICODE"
+            ],
+            "compilerPath": "C:\\MinGW\\bin\\gcc.exe",
+            "cStandard": "c11",
+            "cppStandard": "gnu++14",
+            "intelliSenseMode": "windows-gcc-x86"
+        },
+        {
+            "name": "Arduino",
+            "includePath": [
+              "${workspaceFolder}/**",
+              "C:/Program Files (x86)/Arduino/libraries/**",
+              "C:/Users/DANIELE/Documents/Arduino/libraries/**",
+              "C:/Users/DANIELE/AppData/Local/Arduino15/packages/esp32/hardware/esp32/2.0.5/**"
+            ],
+            "forcedInclude": [],
+            "defines": [
+              "ARDUINO=100",
+              "USBCON"
+            ],
+            "intelliSenseMode": "gcc-x64",
+            "cStandard": "c11",
+            "cppStandard": "c++17"
+          }
+      
+    ],
+    "version": 4
+}

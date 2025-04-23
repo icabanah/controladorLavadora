@@ -163,6 +163,7 @@ SubEstadoTanda subEstado = LAVADO;
 
 // Declaraciones anticipadas de funciones
 void enviarComandoNextion(String comando);
+bool leerNivelAguaEstable();
 void actualizarEstadoEnPantalla(String nuevoEstado);
 void iniciarDesfogueFinal();
 void procesarTanda(int numeroTanda);
@@ -186,23 +187,29 @@ void enviarComandoNextion(String comando)
   // delay(10);
 }
 
-// Función para leer el nivel de agua
-bool leerNivelAgua()
+// Función modificada para muestreo más estable del nivel de agua
+// Esta función hace múltiples lecturas y devuelve un promedio para evitar falsas lecturas
+bool leerNivelAguaEstable()
 {
-  int valorADC = analogRead(NIVEL_AGUA_PIN);
-
-  // Convertir el valor ADC a voltaje real (antes del divisor)
-  float voltajeLeido = (valorADC * VOLTAJE_MAX_ENTRADA) / VALOR_MAX_ADC;
-
-  // Para depuración
-  static unsigned long ultimoLog = 0;
-  if (millis() - ultimoLog > 1000)
-  {
-    ultimoLog = millis();
+  // Tomar varias muestras y promediar para mayor estabilidad
+  const int NUM_MUESTRAS = 5;
+  float sumaMuestras = 0;
+  
+  for (int i = 0; i < NUM_MUESTRAS; i++) {
+    int valorADC = analogRead(NIVEL_AGUA_PIN);
+    float voltajeLeido = (valorADC * VOLTAJE_MAX_ENTRADA) / VALOR_MAX_ADC;
+    sumaMuestras += voltajeLeido;
+    delay(10); // Pequeña pausa entre muestras
   }
-
-  // Comparar con el nivel deseado (2.5V)
-  return voltajeLeido >= VOLTAJE_NIVEL;
+  
+  float promedioVoltaje = sumaMuestras / NUM_MUESTRAS;
+  
+  // En el caso del centrifugado usamos un umbral más bajo para evitar falsos positivos
+  if (estadoLavado == CENTRIFUGADO || estadoLavado == PREPARACION_CENTRIFUGADO) {
+    return promedioVoltaje >= (VOLTAJE_NIVEL - 0.5); // Umbral más bajo durante centrifugado
+  }
+  
+  return promedioVoltaje >= VOLTAJE_NIVEL;
 }
 
 void actualizarEstadoEnPantalla(String nuevoEstado)
@@ -217,7 +224,7 @@ void actualizarEstadoEnPantalla(String nuevoEstado)
 void procesarTanda(int numeroTanda)
 {
   unsigned long tiempoActual = millis();
-  bool nivelLimiteAgua = leerNivelAgua();
+  bool nivelLimiteAgua = leerNivelAguaEstable();
   static String estadoAnterior = "";
 
   // Inicialización de tiempos si es la primera vez
@@ -409,7 +416,7 @@ void procesarCentrifugado()
   if (tiempos.inicioCentrifugado == 0)
   {
     // Verificaciones de seguridad antes de iniciar
-    if (leerNivelAgua())
+    if (leerNivelAguaEstable() && estadoLavado != EMERGENCIA)
     {
       // Si aún hay agua, mantener desfogue abierto y esperar
       if (tiempoActual - ultimaVerificacionNivel >= INTERVALO_VERIFICACION) {
@@ -420,10 +427,11 @@ void procesarCentrifugado()
         actualizarEstadoEnPantalla("Esperando desfogue " + String(contadorIntentos));
       }
       
-      // Si esperamos demasiado tiempo, pasar a emergencia
       if (contadorIntentos >= MAX_INTENTOS) {
-        activarEmergencia();
-        return;
+        actualizarEstadoEnPantalla("Forzando centrifugado");
+        // Inicializar el centrifugado a pesar de la detección de agua
+        tiempos.inicioCentrifugado = tiempoActual;
+        contadorIntentos = 0;
       }
       
       pines.desfogue = false;
@@ -680,7 +688,7 @@ void iniciarPrograma()
       if (subEstado == LAVADO)
       {
         pines.desfogue = true;                // Cerrar desfogue
-        pines.ingresoAgua = !leerNivelAgua(); // Solo abrir si falta agua
+        pines.ingresoAgua = !leerNivelAguaEstable(); // Solo abrir si falta agua
       }
       break;
     case PREPARACION_CENTRIFUGADO:
