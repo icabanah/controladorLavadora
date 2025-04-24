@@ -12,7 +12,7 @@ estado-lavadora.mermaid
 Nextion/NextionRonald/Nextion/pantallaNextion.HMI
 code-version-pin34/code-version-pin34.txt
 code-version-pin34_mejorado/code-version-pin34_mejorado.ino
-/.vscode
+# /code-version-modular/build
 
 # Ignorar todos los archivos Markdown
 *.md

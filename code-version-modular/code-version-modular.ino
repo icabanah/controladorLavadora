@@ -1,3 +1,4 @@
+// #include <Arduino.h>
 #include "include/config.h"
 #include "include/structs.h"
 #include "include/funciones_utiles.h"
@@ -40,20 +41,19 @@ void setup()
   pines.aplicar();
   banderas.reset();
   tiempos.reset();
+  
+  // Inicializar el sistema de antirrebote para el botón de emergencia
+  inicializarAntirreboteEmergencia();
 }
 
 void loop()
 {
-  // Revisar el botón físico de emergencia
-  static bool lastBtnState = HIGH; // Estado anterior del botón
-  bool currentBtnState = digitalRead(BTN_EMERGENCIA_PIN);
-
-  // Detección de flanco descendente para activar la emergencia
-  if (currentBtnState == LOW && lastBtnState == HIGH)
+  // Revisar el botón físico de emergencia utilizando el antirrebote
+  if (leerBotonEmergencia())
   {
+    // Solo se ejecuta cuando se detecta una pulsación válida (con antirrebote)
     activarEmergencia();
   }
-  lastBtnState = currentBtnState;
 
   // Procesar comandos recibidos desde la pantalla Nextion
   procesarComandosNextion();

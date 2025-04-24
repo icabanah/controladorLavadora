@@ -11,5 +11,7 @@ void actualizarEstadoEnPantalla(String nuevoEstado);
 uint16_t calcularTiempoTotal();
 void actualizarTiempo();
 String formatearTiempo(uint16_t segundos);
+bool leerBotonEmergencia();
+void inicializarAntirreboteEmergencia();
 
 #endif // FUNCIONES_UTILES_H

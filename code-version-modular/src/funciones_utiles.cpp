@@ -1,6 +1,21 @@
 #include "../include/funciones_utiles.h"
 #include "../include/comunicacion.h"
 
+// Variables globales para el antirrebote del botón de emergencia
+const unsigned long DEBOUNCE_DELAY = 50; // 50 ms de tiempo de rebote
+volatile unsigned long lastDebounceTime = 0;
+volatile bool btnEmergenciaState = HIGH;     // Estado actual 
+volatile bool lastBtnEmergenciaState = HIGH; // Último estado estable
+volatile bool btnEmergenciaPressed = false;  // Flag para indicar pulsación válida
+
+// Inicializar el sistema de antirrebote
+void inicializarAntirreboteEmergencia() {
+  btnEmergenciaState = digitalRead(BTN_EMERGENCIA_PIN);
+  lastBtnEmergenciaState = btnEmergenciaState;
+  lastDebounceTime = millis();
+  btnEmergenciaPressed = false;
+}
+
 // Función modificada para muestreo más estable del nivel de agua
 bool leerNivelAguaEstable()
 {
@@ -99,4 +114,44 @@ String formatearTiempo(uint16_t segundos)
   return (horas < 10 ? "0" : "") + String(horas) + ":" +
          (minutos < 10 ? "0" : "") + String(minutos) + ":" +
          (segs < 10 ? "0" : "") + String(segs);
+}
+
+// Implementación robusta de antirrebote para el botón de emergencia
+bool leerBotonEmergencia() {
+  // Leer el estado actual del botón
+  bool currentReading = digitalRead(BTN_EMERGENCIA_PIN);
+  
+  // Verificar si hubo un cambio de estado
+  if (currentReading != lastBtnEmergenciaState) {
+    // Registrar el tiempo del cambio
+    lastDebounceTime = millis();
+    // Actualizar el último estado leído
+    lastBtnEmergenciaState = currentReading;
+  }
+
+  // Verificar si ha pasado suficiente tiempo desde el último cambio
+  unsigned long currentTime = millis();
+  
+  // Protección contra desbordamiento
+  if (currentTime < lastDebounceTime) {
+    lastDebounceTime = currentTime;
+    return false;
+  }
+  
+  // Si ha pasado el tiempo de estabilización desde el último cambio
+  if ((currentTime - lastDebounceTime) > DEBOUNCE_DELAY) {
+    // Si el estado actual es diferente al último estado estable (filtrado)
+    if (currentReading != btnEmergenciaState) {
+      btnEmergenciaState = currentReading;
+      
+      // Detectar flanco descendente (botón presionado)
+      if (btnEmergenciaState == LOW) {
+        btnEmergenciaPressed = true;
+        return true;
+      }
+    }
+  }
+  
+  // Si no se detectó una pulsación válida, retornar falso
+  return false;
 }

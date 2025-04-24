@@ -1,38 +1,27 @@
 {
-    "configurations": [
-        {
-            "name": "Win32",
-            "includePath": [
-                "${workspaceFolder}/**"
-            ],
-            "defines": [
-                "_DEBUG",
-                "UNICODE",
-                "_UNICODE"
-            ],
-            "compilerPath": "C:\\MinGW\\bin\\gcc.exe",
-            "cStandard": "c11",
-            "cppStandard": "gnu++14",
-            "intelliSenseMode": "windows-gcc-x86"
-        },
-        {
-            "name": "Arduino",
-            "includePath": [
+  "configurations": [
+      {
+          "name": "ESP32-WROOM-DA",
+          "includePath": [
               "${workspaceFolder}/**",
-              "C:/Program Files (x86)/Arduino/libraries/**",
-              "C:/Users/DANIELE/Documents/Arduino/libraries/**",
-              "C:/Users/DANIELE/AppData/Local/Arduino15/packages/esp32/hardware/esp32/2.0.5/**"
-            ],
-            "forcedInclude": [],
-            "defines": [
-              "ARDUINO=100",
-              "USBCON"
-            ],
-            "intelliSenseMode": "gcc-x64",
-            "cStandard": "c11",
-            "cppStandard": "c++17"
-          }
-      
-    ],
-    "version": 4
+              "C:/Users/Daniele/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.2.0/**",
+              "C:/Users/Daniele/AppData/Local/Arduino15/packages/esp32/tools/**",
+              "C:/Users/Daniele/AppData/Local/Arduino15/libraries/**",
+              "C:/Users/Daniele/Documents/Arduino/libraries/**"
+          ],
+          "defines": [
+              "ARDUINO=10819",
+              "ESP32",
+              "ESP_PLATFORM",
+              "F_CPU=240000000L",
+              "HAVE_CONFIG_H",
+              "MBEDTLS_CONFIG_FILE=\"mbedtls/esp_config.h\""
+          ],
+          "compilerPath": "C:/Users/DANIELE/AppData/Local/Arduino15/packages/esp32/tools/esp-x32/2411/bin/xtensa-esp32-elf-g++.exe",
+          "cStandard": "c11",
+          "cppStandard": "c++17",
+          "intelliSenseMode": "gcc-x64"
+      }
+  ],
+  "version": 4
 }

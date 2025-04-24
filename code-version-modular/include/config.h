@@ -1,3 +1,4 @@
+
 #ifndef CONFIG_H
 #define CONFIG_H
 
@@ -12,6 +13,8 @@
 #define CENTRIFUGAR_PIN 27
 #define INGRESAR_AGUA_PIN 26
 #define DESFOGAR_PIN 25
+
+#include <Arduino.h>
 
 // Configuración del ADC para el divisor de voltaje
 const float VOLTAJE_MAX_ENTRADA = 3.8; // Voltaje máximo de entrada (antes del divisor)
