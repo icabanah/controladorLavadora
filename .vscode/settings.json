@@ -1,0 +1,5 @@
+{
+  // "arduino.port": "COM3", // Reemplaza COMX por tu puerto (ej. COM3)
+  "arduino.commandPath": "C:\\arduino-cli\\arduino-cli.exe", // Si usas Arduino CLI
+  "arduino.path": "C:\\Program Files\\Arduino IDE\\Arduino IDE.exe" // Si usas Arduino IDE
+}

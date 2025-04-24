@@ -1,0 +1,22 @@
+{
+    "version": "2.0.0",
+    "tasks": [
+      {
+        "label": "Arduino: Verify",
+        "type": "shell",
+        "command": "arduino-cli compile --fqbn esp32:esp32:esp32-wroom-da ${workspaceFolder}/code-version-modular/",
+        "group": {
+          "kind": "build",
+          "isDefault": true
+        },
+        "problemMatcher": ["$gcc"]
+      },
+      {
+        "label": "Arduino: Upload",
+        "type": "shell",
+        "command": "arduino-cli upload -p ${config:arduino.port} --fqbn esp32:esp32:esp32-wroom-da ${workspaceFolder}/code-version-modular",
+        "group": "build",
+        "problemMatcher": []
+      }
+    ]
+  }

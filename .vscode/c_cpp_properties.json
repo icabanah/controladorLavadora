@@ -3,7 +3,7 @@
       {
           "name": "ESP32-WROOM-DA",
           "includePath": [
-              "${workspaceFolder}/**",
+              "${workspaceFolder}/code-version-modular/**",
               "C:/Users/Daniele/AppData/Local/Arduino15/packages/esp32/hardware/esp32/3.2.0/**",
               "C:/Users/Daniele/AppData/Local/Arduino15/packages/esp32/tools/**",
               "C:/Users/Daniele/AppData/Local/Arduino15/libraries/**",
